@@ -5,7 +5,9 @@ const { validateMongoDbId } = require("../utils/validate_mongo_db_id");
 
 
 const createQuizCategory = asyncHandler(async (req, res) => {
+    console.log("calling create quiz category");
     const { title } = req.body;
+    
 
     try {
         // Check if a quiz category with the same title already exists
@@ -52,6 +54,8 @@ const getAllQuizCategories = asyncHandler(async (req, res) => {
 });
 
 const getSpecificQuizCategory = asyncHandler(async (req, res) => {
+    console.log("calling update quiz category");
+
     const { quiz_category_id } = req.params;
 
     try {
@@ -73,6 +77,7 @@ const getSpecificQuizCategory = asyncHandler(async (req, res) => {
 });
 
 const deleteSpecificQuizCategory = asyncHandler(async (req, res) => {
+
     const { quiz_category_id } = req.params;
 
     try {
@@ -99,6 +104,8 @@ const deleteSpecificQuizCategory = asyncHandler(async (req, res) => {
 const updateQuizCategory = asyncHandler(async (req, res) => {
     const { quiz_category_id } = req.params;
     const { title } = req.body;
+    
+    
 
     try {
 

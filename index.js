@@ -14,6 +14,7 @@ const { notFound, errorHandler } = require('./middlewares/error_handler');
 const morgan = require('morgan');
 const cors = require("cors");
 const helmet = require('helmet');
+const path = require('path');
 
 const PORT = process.env.PORT || 4444;
 dbConnect();
@@ -41,12 +42,12 @@ app.use('/api/quiz/result', quizResultRouter);
 app.use('/api/avatar', avatarRouter);
 
 // Serve React build
-// app.use(express.static(path.join(__dirname, 'client/build')));
+app.use(express.static(path.join(__dirname, './client/build')));
 
-// // React routing fallback
-// app.get('*', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-// });
+// React routing fallback
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, './client/build', 'index.html'));
+});
 
 // app.use(notFound);
 // app.use(errorHandler);
