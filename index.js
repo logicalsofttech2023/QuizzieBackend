@@ -2,9 +2,7 @@ const express = require('express');
 const dbConnect = require('./config/db_connect');
 const bodyParser = require('body-parser');
 const app = express();
-// eslint-disable-next-line no-unused-vars
 const dotenv = require('dotenv').config();
-// Removed duplicate declaration of PORT
 const authRouter = require('./routes/auth_routes');
 const quizCategoryRouter = require('./routes/quiz_category_routes');
 const quizRouter = require('./routes/quiz_routes');
@@ -27,12 +25,12 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 // This disables the Content-Security-Policy
 // and X-Download-Options headers.
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-    xDownloadOptions: false,
-  })
-);
+// app.use(
+//   helmet({
+//     contentSecurityPolicy: false,
+//     xDownloadOptions: false,
+//   })
+// );
 
 app.use('/api/user', authRouter);
 app.use('/api/quiz/category', quizCategoryRouter);
@@ -42,8 +40,16 @@ app.use('/api', dashboardRouter);
 app.use('/api/quiz/result', quizResultRouter);
 app.use('/api/avatar', avatarRouter);
 
-app.use(notFound);
-app.use(errorHandler);
+// Serve React build
+// app.use(express.static(path.join(__dirname, 'client/build')));
+
+// // React routing fallback
+// app.get('*', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+// });
+
+// app.use(notFound);
+// app.use(errorHandler);
 
 
 

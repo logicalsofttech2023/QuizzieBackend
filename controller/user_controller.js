@@ -21,6 +21,8 @@ const createUser = asyncHandler(async (req, res) => {
 
         const allAvatars = await Avatar.find();
         const randomProfilePic = lodash.sample(allAvatars);
+        const profilePicUrl = randomProfilePic?.url || 'default-avatar-url.png'; // provide a fallback or handle accordingly
+
 
         if (findUserByEmail) {
             return res.json({ code: 404, status: false, message: 'Email address already exists' });
@@ -38,7 +40,7 @@ const createUser = asyncHandler(async (req, res) => {
                 email: req.body.email,
                 mobile: req.body.mobile,
                 password: req.body.password,
-                profilePic: randomProfilePic.url
+                profilePic: profilePicUrl
             });
 
             const result = {
@@ -57,14 +59,14 @@ const createUser = asyncHandler(async (req, res) => {
             await Otp.findOneAndUpdate({ mobile: newUser.mobile }, { otp: generatedOtp, createdAt: new Date() }, { upsert: true });
 
             // Send the OTP to the user's mobile number using sms service
-            sendSMS(`+91${newUser.mobile}`, `Your Quizze Thunder OTP code is: ${generatedOtp}`)
-                .then(message => console.log('OTP sent:', message.sid))
-                .catch(error => console.error('Error sending OTP:', error));
+            // sendSMS(`+91${newUser.mobile}`, `Your Quizze Thunder OTP code is: ${generatedOtp}`)
+            //     .then(message => console.log('OTP sent:', message.sid))
+            //     .catch(error => console.error('Error sending OTP:', error));
 
-            // Send welcome mail to new user
-            sendWelcomeMail(newUser.email, newUser.firstname);
+            // // Send welcome mail to new user
+            // sendWelcomeMail(newUser.email, newUser.firstname);
 
-            res.json({ code: 200, status: true, message: 'User created successfully', result: result });
+            res.json({ code: 200, status: true, message: 'User created successfully', result: result, otp: generatedOtp, });
         }
     }
     catch (err) {
@@ -156,11 +158,11 @@ const loginUser = asyncHandler(async (req, res) => {
                     await Otp.findOneAndUpdate({ mobile: mobile }, { otp: generatedOtp, createdAt: new Date() }, { upsert: true });
 
                     // Send the generatedOtp to the user's mobile number using sms service
-                    sendSMS(`+91${mobile}`, `Your Quizze Thunder OTP code is: ${generatedOtp}`)
-                        .then(message => console.log('OTP sent:', message.sid))
-                        .catch(error => console.error('Error sending OTP:', error));
+                    // sendSMS(`+91${mobile}`, `Your Quizze Thunder OTP code is: ${generatedOtp}`)
+                    //     .then(message => console.log('OTP sent:', message.sid))
+                    //     .catch(error => console.error('Error sending OTP:', error));
 
-                    return res.json({ code: 210, status: true, message: 'OTP has been sent successfully on your given phone number' });
+                    return res.json({ code: 210, status: true, message: 'OTP has been sent successfully on your given phone number', otp: generatedOtp });
                 }
 
                 if (user.isBlocked) {
