@@ -76,7 +76,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
       await user.save();
   
       // If user is already registered (email and password exist)
-      if (user.email) {
+      if (user.userEmail) {
         const token = generateToken(user._id);
   
         return res.json({
@@ -88,9 +88,10 @@ const verifyOtp = asyncHandler(async (req, res) => {
           result: {
             firstname: user.firstname,
             lastname: user.lastname,
-            email: user.email,
+            userEmail: user.userEmail,
             mobile: user.mobile,
             profile_pic: user.profilePic,
+            userId: user._id,
           },
         });
       }
@@ -151,7 +152,7 @@ const resendOtp = asyncHandler(async (req, res) => {
 });
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { firstname, lastname, email, mobile } = req.body;
+  const { firstname, lastname, userEmail, mobile } = req.body;
 
   const user = await User.findOne({ mobile });
 
@@ -171,11 +172,11 @@ const registerUser = asyncHandler(async (req, res) => {
     });
   }
 
-  if (user.email) {
+  if (user.userEmail) {
     return res.json({
       code: 409,
       status: false,
-      message: "User already registered with email",
+      message: "User already registered with userEmail",
     });
   }
 
@@ -184,7 +185,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   user.firstname = firstname;
   user.lastname = lastname;
-  user.email = email;
+  user.userEmail = userEmail;
   user.profilePic = profilePicUrl;
 
   await user.save();
@@ -199,7 +200,7 @@ const registerUser = asyncHandler(async (req, res) => {
     result: {
       firstname: user.firstname,
       lastname: user.lastname,
-      email: user.email,
+      userEmail: user.userEmail,
       mobile: user.mobile,
       profile_pic: user.profilePic,
       createdAt: user.createdAt,
@@ -208,11 +209,11 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const createUser = asyncHandler(async (req, res) => {
-  const email = req.body.email;
+  const userEmail = req.body.userEmail;
   const mobile = req.body.mobile;
 
   try {
-    const findUserByEmail = await User.findOne({ email: email });
+    const findUserByEmail = await User.findOne({ userEmail: userEmail });
     const findUserByMobile = await User.findOne({ mobile: mobile });
 
     const allAvatars = await Avatar.find();
@@ -239,7 +240,7 @@ const createUser = asyncHandler(async (req, res) => {
       const newUser = await User.create({
         firstname: req.body.firstname,
         lastname: req.body.lastname,
-        email: req.body.email,
+        userEmail: req.body.userEmail,
         mobile: req.body.mobile,
         password: req.body.password,
         profilePic: profilePicUrl,
@@ -248,7 +249,7 @@ const createUser = asyncHandler(async (req, res) => {
       const result = {
         firstname: newUser.firstname,
         lastname: newUser.lastname,
-        email: newUser.email,
+        userEmail: newUser.userEmail,
         mobile: newUser.mobile,
         _id: newUser._id,
         profile_pic: newUser.profilePic,
@@ -426,7 +427,7 @@ const loginUser = asyncHandler(async (req, res) => {
           _id: user._id,
           firstname: user.firstname,
           lastname: user.lastname,
-          email: user.email,
+          userEmail: user.userEmail,
           mobile: user.mobile,
           about: user.about,
           profile_pic: user.profilePic,
@@ -471,7 +472,7 @@ const adminLogin = asyncHandler(async (req, res) => {
             _id: user._id,
             firstname: user.firstname,
             lastname: user.lastname,
-            email: user.email,
+            userEmail: user.userEmail,
             mobile: user.mobile,
             profile_pic: user.profilePic,
             token: generateToken(user._id),
@@ -510,7 +511,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
     if (search) {
       query.$or = [
         { firstname: { $regex: search, $options: "i" } }, // Case-insensitive firstname search
-        { email: { $regex: search, $options: "i" } }, // Case-insensitive email search
+        { userEmail: { $regex: search, $options: "i" } }, // Case-insensitive email search
         { mobile: { $regex: search, $options: "i" } }, // Case-insensitive mobile search
       ];
     }
@@ -612,8 +613,8 @@ const updateUser = asyncHandler(async (req, res) => {
 
     // If the requester is an admin, allow them to update additional fields
     if (role === "admin") {
-      if (req.body.email) {
-        updateFields.email = req.body.email;
+      if (req.body.userEmail) {
+        updateFields.userEmail = req.body.userEmail;
       }
       if (req.body.mobile) {
         updateFields.mobile = req.body.mobile;

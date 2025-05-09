@@ -10,7 +10,7 @@ var userSchema = new mongoose.Schema(
     lastname: {
       type: String,
     },
-    email: {
+    userEmail: {
       type: String,
       unique: true,
     },
