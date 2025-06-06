@@ -11,13 +11,33 @@ const quizSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
-    category: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'QuizCategory',
-        required: true,
+    prize: {
+        type: String,
+        required: true
     },
-
+    date: {
+        type: Date,
+        required: true
+    },
+    entries: {
+        type: String,
+        default: '0'
+    },
+    joiningAmount: {
+        type: String,
+        required: true
+    },
+    type: {
+        type: String,
+        enum: ['Mega Quiz', 'Special Quiz', 'Lite Quiz'],
+        required: true
+    },
+    status: {
+        type: String,
+        enum: ['upcoming', 'completed'],
+        default: 'upcoming'
+    }
 }, { timestamps: true, versionKey: false });
 
-//Export the model
+// Export the model
 module.exports = mongoose.model('Quiz', quizSchema);

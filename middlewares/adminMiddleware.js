@@ -1,8 +1,9 @@
 const User = require('../models/user_model');
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
+const Admin = require('../models/AdminModel');
 
-const authMiddleware = asyncHandler(async (req, res, next) => {
+const adminMiddleware = asyncHandler(async (req, res, next) => {
     let token;
     if (
         req.headers.authorization &&
@@ -14,7 +15,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 console.log(decoded);
                                 
-                req.user = await User.findById(decoded.id);
+                req.user = await Admin.findById(decoded.id);
                 next();
             }
         }
@@ -26,14 +27,4 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     }
 });
 
-const isAdmin = asyncHandler(async (req, res, next) => {
-    const { email } = req.user;
-    const adminUser = await User.findOne({ userEmail: email });
-    if (adminUser && adminUser.role === 'admin') {
-        next();
-    } else {
-        return res.status(401).json({ message: 'User is not an admin' });
-    }
-})
-
-module.exports = { authMiddleware, isAdmin };
+module.exports = { adminMiddleware };

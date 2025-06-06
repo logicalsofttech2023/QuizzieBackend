@@ -1,33 +1,28 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { createUser, loginUser, adminLogin, getAllUsers, getSpecificUser,
-    deleteSpecificUser, updateUser, updateUserBlockStatus, logout,
-    forgotPassword, createNewPassword, updatePassword, verifyMobileOtp, 
-    generateOtp,
-    verifyOtp,
-    resendOtp,
-    registerUser} = require('../controller/user_controller');
-const { authMiddleware, isAdmin } = require('../middlewares/auth_middleware');
+const {
+  generateOtp,
+  verifyOtp,
+  resendOtp,
+  registerUser,
+  submitQuizResult,
+  getAllQuizResults,
+  getQuizResultById,
+  getQuizByStatus,
+  getQuizResultsByUserId,
+} = require("../controller/user_controller");
+const { authMiddleware, isAdmin } = require("../middlewares/auth_middleware");
 
-// router.post('/register', createUser);
-// router.post('/verify/mobile-otp', verifyMobileOtp);
-//router.post('/verify/email-otp', verifyEmailOtp);
 
-router.post('/generateOtp', generateOtp);
-router.post('/verifyOtp', verifyOtp);
-router.post('/resendOtp', resendOtp);
-router.post('/registerUser', registerUser);
+router.post("/generateOtp", generateOtp);
+router.post("/verifyOtp", verifyOtp);
+router.post("/resendOtp", resendOtp);
+router.post("/registerUser", registerUser);
 
-router.post('/login', loginUser);
-router.post('/admin-login', adminLogin);
-router.get('/all-users', authMiddleware, isAdmin, getAllUsers);
-router.get('/:user_id', authMiddleware, getSpecificUser);
-router.delete('/:user_id', authMiddleware, isAdmin, deleteSpecificUser);
-router.put('/update/:user_id', authMiddleware, updateUser);
-router.put('/:user_id/block-status', authMiddleware, isAdmin, updateUserBlockStatus);
-router.get('/logout', authMiddleware, logout);
-router.post('/forgot-password', forgotPassword);
-router.put('/create-new-password', createNewPassword);
-router.put('/update-password', authMiddleware, updatePassword);
+router.post("/submitQuizResult", authMiddleware, submitQuizResult);
+router.get("/getAllQuizResults", getAllQuizResults);
+router.get("/getQuizResultById", getQuizResultById);
+router.get("/getQuizResultsByUserId", authMiddleware, getQuizResultsByUserId);
+router.get("/getQuizByStatus", getQuizByStatus);
 
 module.exports = router;
