@@ -29,11 +29,6 @@ const faqSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    category: {
-      type: String,
-      enum: ["general", "pricing", "account", "technical"],
-      default: "general",
-    },
     isActive: {
       type: Boolean,
       default: true,

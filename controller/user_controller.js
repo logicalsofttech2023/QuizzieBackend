@@ -610,6 +610,13 @@ const getAllQuestionsByQuizId = asyncHandler(async (req, res) => {
       return res.json({ code: 404, status: false, message: "User not found" });
     }
 
+    // ✅ Combine quiz.date and quiz.startTime into a DateTime
+    const quizDateTimeStr = `${quiz.date} ${quiz.startTime}`; // e.g., "2025-06-07 01:00 PM"
+    const quizStartDateTime = new Date(quizDateTimeStr);
+    const now = new Date();
+
+    const canJoin = now < quizStartDateTime;
+
     // Check if user already joined
     if (!quiz.users.includes(user_id)) {
       const joiningAmount = parseFloat(quiz.joiningAmount);
@@ -629,8 +636,8 @@ const getAllQuestionsByQuizId = asyncHandler(async (req, res) => {
       await user.save();
 
       // Add user to quiz's users array
-      quiz.users.push(user_id);
-      await quiz.save();
+      // quiz.users.push(user_id);
+      // await quiz.save();
 
       // Generate transaction ID
       const transactionId = generateTransactionId(); // You must define this function
@@ -639,7 +646,7 @@ const getAllQuestionsByQuizId = asyncHandler(async (req, res) => {
       const transaction = new Transaction({
         userId: user_id,
         amount: joiningAmount,
-        type: "subscription", // or "quizParticipation"
+        type: "quizParticipation", // or "quizParticipation"
         status: "success",
         transactionId,
         description: `Joined quiz ${quiz.title} for ₹${joiningAmount}`,
@@ -655,6 +662,7 @@ const getAllQuestionsByQuizId = asyncHandler(async (req, res) => {
       code: 200,
       status: true,
       message: "Quiz questions fetched successfully",
+      canJoin,
       quiz: quiz,
       questions: randomQuestions,
     });
@@ -728,6 +736,154 @@ const addMoneyToWallet = async (req, res) => {
   }
 };
 
+const getAllQuiz = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const allQuizzes = await Quiz.find().sort({ createdAt: -1 });
+
+    if (allQuizzes.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No quiz found",
+      });
+    }
+
+    // Separate quizzes based on whether the user has participated
+    const completed = [];
+    const upcoming = [];
+
+    allQuizzes.forEach((quiz) => {
+      if (quiz.users.includes(userId)) {
+        completed.push(quiz);
+      } else {
+        upcoming.push(quiz);
+      }
+    });
+
+    res.json({
+      code: 200,
+      status: true,
+      completed,
+      upcoming,
+    });
+  } catch (err) {
+    console.error("Error fetching quizzes:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+const joinQuiz = asyncHandler(async (req, res) => {
+  const user_id = req.user?.id;
+  const { quiz_id } = req.body;
+
+  try {
+    if (!validateMongoDbId(quiz_id)) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "Invalid quiz id format",
+      });
+    }
+
+    const quiz = await Quiz.findById(quiz_id);
+    if (!quiz) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Quiz not found",
+      });
+    }
+
+    const user = await User.findById(user_id);
+    if (!user) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "User not found",
+      });
+    }
+
+    // Combine quiz.date and quiz.startTime into DateTime
+    const quizDateTimeStr = `${quiz.date} ${quiz.startTime}`; // e.g. "2025-06-07 01:00 PM"
+    const quizStartDateTime = new Date(quizDateTimeStr);
+    const now = new Date();
+
+    if (now >= quizStartDateTime) {
+      return res.status(403).json({
+        code: 403,
+        status: false,
+        message: "You cannot join this quiz now. Start time has passed.",
+      });
+    }
+
+    // Check if already joined
+    if (quiz.users.includes(user_id)) {
+      return res.status(409).json({
+        code: 409,
+        status: false,
+        message: "You have already joined this quiz",
+      });
+    }
+
+    const joiningAmount = parseFloat(quiz.joiningAmount);
+    const walletBalance = parseFloat(user.wallet);
+
+    if (walletBalance < joiningAmount) {
+      return res.status(402).json({
+        code: 402,
+        status: false,
+        message: "Insufficient wallet balance",
+      });
+    }
+
+    // Deduct wallet
+    user.wallet = (walletBalance - joiningAmount).toFixed(2);
+    await user.save();
+
+    // Add user to quiz
+    quiz.users.push(user_id);
+    await quiz.save();
+
+    // Save transaction
+    const transactionId = generateTransactionId(); // You must define this function
+    const transaction = new Transaction({
+      userId: user_id,
+      amount: joiningAmount,
+      type: "quizParticipation",
+      status: "success",
+      transactionId,
+      description: `Joined quiz ${quiz.title} for ₹${joiningAmount}`,
+    });
+    await transaction.save();
+
+    return res.status(200).json({
+      code: 200,
+      status: true,
+      message: "You have successfully joined the quiz",
+    });
+
+  } catch (err) {
+    console.error("Error joining quiz:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+
+
+
+
 module.exports = {
   generateOtp,
   verifyOtp,
@@ -742,4 +898,5 @@ module.exports = {
   getUserDetail,
   getAllQuestionsByQuizId,
   addMoneyToWallet,
+  getAllQuiz,
 };

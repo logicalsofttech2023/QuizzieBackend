@@ -641,7 +641,7 @@ const getPolicy = async (req, res) => {
 
 const addFAQ = async (req, res) => {
   try {
-    const { question, answer, category } = req.body;
+    const { question, answer } = req.body;
 
     if (!question || !answer) {
       return res.status(400).json({ message: "Question and answer are required." });
@@ -650,7 +650,7 @@ const addFAQ = async (req, res) => {
     const newFAQ = new FAQ({
       question,
       answer,
-      category,
+      
     });
 
     await newFAQ.save();
@@ -664,11 +664,11 @@ const addFAQ = async (req, res) => {
 
 const updateFAQ = async (req, res) => {
   try {
-    const { question, answer, category, isActive, id } = req.body;
+    const { question, answer, isActive, id } = req.body;
 
     const updatedFAQ = await FAQ.findByIdAndUpdate(
       id,
-      { question, answer, category, isActive },
+      { question, answer, isActive },
       { new: true, runValidators: true }
     );
 
