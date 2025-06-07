@@ -42,6 +42,10 @@ var userSchema = new mongoose.Schema(
       default:
         "https://res.cloudinary.com/dt6hyafmc/image/upload/v1692392344/Avatars/avatar_8609.png",
     },
+    wallet: {
+      type: String,
+      default: 0,
+    },
     otp: String,
     otpCreatedAt: Date,
   },

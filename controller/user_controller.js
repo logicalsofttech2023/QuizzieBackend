@@ -8,6 +8,15 @@ const lodash = require("lodash");
 const Question = require("../models/question_model");
 const Quiz = require("../models/quiz_model");
 const QuizResult = require("../models/quiz_result_model");
+const Transaction = require("../models/TransactionModel");
+
+const crypto = require("crypto");
+
+const generateTransactionId = () => {
+  const randomString = crypto.randomBytes(5).toString("hex").toUpperCase(); // 10 characters
+  const formattedId = `QV${randomString.match(/.{1,2}/g).join("")}`; // PJ + split into 2-char groups
+  return formattedId;
+};
 
 const generateOtp = asyncHandler(async (req, res) => {
   const { mobile } = req.body;
@@ -240,8 +249,6 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 });
 
-
-
 const logout = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   try {
@@ -257,6 +264,82 @@ const logout = asyncHandler(async (req, res) => {
     }
   } catch (err) {
     throw new Error(err);
+  }
+});
+
+const getUserDetail = asyncHandler(async (req, res) => {
+  const user_id = req?.user?.id;
+  console.log(user_id);
+
+  if (!user_id) {
+    return res
+      .status(400)
+      .json({ status: false, message: "User ID is required" });
+  }
+
+  try {
+    const user = await User.findById(user_id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ status: false, message: "User not found" });
+    }
+
+    // Fetch quiz stats
+    const quizResults = await QuizResult.find({ user: user_id });
+
+    const total_quiz_played = quizResults.reduce(
+      (sum, r) => sum + (r.quizPlayed || 0),
+      0
+    );
+    const quiz_won = quizResults.reduce((sum, r) => sum + (r.quizWon || 0), 0);
+    const points = quizResults.reduce((sum, r) => sum + (r.points || 0), 0);
+
+    const average_points_per_quiz =
+      total_quiz_played > 0 ? points / total_quiz_played : 0;
+    const success_rate =
+      total_quiz_played > 0 ? (quiz_won / total_quiz_played) * 100 : 0;
+    const quiz_participation_rate = total_quiz_played * 100; // or implement your logic
+
+    // Rank calculation example (simplified - based on total points)
+    const allResults = await QuizResult.aggregate([
+      {
+        $group: {
+          _id: "$user",
+          totalPoints: { $sum: "$points" },
+        },
+      },
+      { $sort: { totalPoints: -1 } },
+    ]);
+
+    const rank =
+      allResults.findIndex((r) => r._id.toString() === user_id.toString()) + 1;
+
+    return res.status(200).json({
+      status: true,
+      message: "User detail fetched successfully",
+      user,
+      stats: {
+        quiz_won,
+        _id: user_id,
+        points,
+        total_quiz_played,
+        rank,
+        success_rate,
+        average_points_per_quiz,
+        quiz_participation_rate,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+    return res
+      .status(500)
+      .json({
+        status: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
   }
 });
 
@@ -461,15 +544,15 @@ const getQuizResultsByUserId = asyncHandler(async (req, res) => {
 });
 
 const getQuizByStatus = asyncHandler(async (req, res) => {
-  const { status, type } = req.query;
-
+  const { quiz_id } = req.query;
   try {
     // Build filter object dynamically
     const filter = {};
-    if (status) filter.status = status;
-    if (type) filter.type = type;
+    if (quiz_id) filter._id = quiz_id;
 
     const allQuizzes = await Quiz.find(filter).sort({ createdAt: -1 });
+
+
 
     if (allQuizzes.length === 0) {
       return res.status(404).json({
@@ -479,10 +562,16 @@ const getQuizByStatus = asyncHandler(async (req, res) => {
       });
     }
 
+    // Map joined user count to each quiz
+    const quizzesWithUserCount = allQuizzes.map((quiz) => ({
+      ...quiz._doc,
+      joinedUsers: quiz.users?.length || 0,
+    }));
+
     res.json({
       code: 200,
       status: true,
-      quizzes: allQuizzes,
+      quizzes: quizzesWithUserCount,
     });
   } catch (err) {
     console.error("Error fetching quizzes:", err);
@@ -495,6 +584,150 @@ const getQuizByStatus = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllQuestionsByQuizId = asyncHandler(async (req, res) => {
+  const user_id = req?.user?.id;
+  const { quiz_id } = req.query;
+
+  try {
+    // Check if the provided quiz_id is a valid ObjectId
+    if (!validateMongoDbId(quiz_id)) {
+      return res.json({
+        code: 400,
+        status: false,
+        message: "Invalid quiz id format",
+      });
+    }
+
+    // Find the quiz by ID
+    const quiz = await Quiz.findById(quiz_id);
+
+    if (!quiz) {
+      return res.json({ code: 404, status: false, message: "Quiz not found" });
+    }
+
+    const user = await User.findById(user_id);
+    if (!user) {
+      return res.json({ code: 404, status: false, message: "User not found" });
+    }
+
+    // Check if user already joined
+    if (!quiz.users.includes(user_id)) {
+      const joiningAmount = parseFloat(quiz.joiningAmount);
+      const walletBalance = parseFloat(user.wallet);
+
+      // Check wallet balance
+      if (walletBalance < joiningAmount) {
+        return res.json({
+          code: 402,
+          status: false,
+          message: "Insufficient wallet balance",
+        });
+      }
+
+      // Deduct joiningAmount
+      user.wallet = (walletBalance - joiningAmount).toFixed(2);
+      await user.save();
+
+      // Add user to quiz's users array
+      quiz.users.push(user_id);
+      await quiz.save();
+
+      // Generate transaction ID
+      const transactionId = generateTransactionId(); // You must define this function
+
+      // Save transaction
+      const transaction = new Transaction({
+        userId: user_id,
+        amount: joiningAmount,
+        type: "subscription", // or "quizParticipation"
+        status: "success",
+        transactionId,
+        description: `Joined quiz ${quiz.title} for ₹${joiningAmount}`,
+      });
+      await transaction.save();
+    }
+
+    // Find all questions for the given quiz ID and populate the 'quiz' field in each question
+    const questions = await Question.find({ quiz: quiz_id }).select("-quiz");
+    const randomQuestions = lodash.sampleSize(questions, 10); // Get 10 random questions
+
+    res.json({
+      code: 200,
+      status: true,
+      message: "Quiz questions fetched successfully",
+      quiz: quiz,
+      questions: randomQuestions,
+    });
+  } catch (err) {
+    throw new Error(err);
+  }
+});
+
+const addMoneyToWallet = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let { amount } = req.body;
+
+    // Convert amount to number
+    amount = parseFloat(amount);
+
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Invalid amount", status: false });
+    }
+
+    let user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found", status: false });
+    }
+
+    // Ensure wallet is a number
+    user.wallet = Number(user.wallet) + amount;
+    await user.save();
+
+    // Generate unique transaction ID using crypto
+    const transactionId = generateTransactionId();
+
+    // Create a new transaction record
+    const transaction = new Transaction({
+      userId,
+      amount,
+      type: "addMoney",
+      status: "success",
+      transactionId,
+      description: `Added ₹${amount} to wallet`,
+    });
+
+    await transaction.save();
+
+    // 🛎️ Send notification
+    const title = "Wallet Amount Added";
+    const body = `₹${amount} has been added to your wallet. Your new balance is ₹${user.wallet}.`;
+
+    try {
+      // 💾 Add notification to DB
+      await addNotification(userId, title, body);
+
+      // 📲 Send push notification if token exists
+      // if (user.firebaseToken) {
+      //   await sendNotification(user.firebaseToken, title, body);
+      // }
+    } catch (notificationError) {
+      console.error("Notification Error:", notificationError);
+      // Notification fail hone par bhi success response bhej rahe hain
+    }
+
+    res.status(200).json({
+      message: `₹${amount} added to wallet successfully`,
+      status: true,
+      walletBalance: user.wallet,
+      transaction,
+    });
+  } catch (error) {
+    console.error("Error in addMoneyToWallet:", error);
+    res.status(500).json({ message: "Server Error", status: false });
+  }
+};
+
 module.exports = {
   generateOtp,
   verifyOtp,
@@ -506,4 +739,7 @@ module.exports = {
   getQuizResultById,
   getQuizResultsByUserId,
   getQuizByStatus,
+  getUserDetail,
+  getAllQuestionsByQuizId,
+  addMoneyToWallet,
 };

@@ -17,6 +17,12 @@ const {
   getSpecificQuiz,
   deleteSpecificQuiz,
   updateQuiz,
+  policyUpdate,
+  getPolicy,
+  addFAQ,
+  updateFAQ,
+  getAllFAQs,
+  getFAQById,
 } = require("../controller/adminController");
 
 const {
@@ -37,6 +43,13 @@ router.get("/getAllUsers", adminMiddleware, getAllUsers);
 router.get("/getSpecificUser", adminMiddleware, getSpecificUser);
 router.delete("/deleteSpecificUser", adminMiddleware, deleteSpecificUser);
 router.put("/updateUserBlockStatus", adminMiddleware, updateUserBlockStatus);
+
+router.put("/policyUpdate", adminMiddleware, policyUpdate);
+router.get("/getPolicy", adminMiddleware, getPolicy);
+router.post("/addFAQ", adminMiddleware, addFAQ);
+router.put("/updateFAQ", adminMiddleware, updateFAQ);
+router.get("/getAllFAQs", adminMiddleware, getAllFAQs);
+router.get("/getFAQById", adminMiddleware, getFAQById);
 
 router.post("/createQuiz", adminMiddleware, createQuiz);
 router.get("/getAllQuizInAdmin", adminMiddleware, getAllQuizInAdmin);

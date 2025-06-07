@@ -1,3 +1,6 @@
+const { Policy, FAQ } = require("../models/PolicyModel");
+const Transaction = require("../models/TransactionModel");
+
 const Quiz = require("../models/quiz_model");
 const Question = require("../models/question_model");
 const asyncHandler = require("express-async-handler");
@@ -325,14 +328,15 @@ const createQuiz = asyncHandler(async (req, res) => {
     joiningAmount,
     type,
     status,
+    startTime,
   } = req.body;
 
   // Basic validation
-  if (!title || !prize || !date || joiningAmount == null || !type) {
+  if (!title || !prize || !date || joiningAmount == null || !type || !startTime) {
     return res.status(400).json({
       code: 400,
       status: false,
-      message: "Required fields: title, prize, date, joiningAmount",
+      message: "Required fields: title, prize, date, startTime, joiningAmount",
     });
   }
 
@@ -357,6 +361,7 @@ const createQuiz = asyncHandler(async (req, res) => {
       joiningAmount,
       type,
       status,
+      startTime,
     });
 
     return res.status(201).json({
@@ -464,6 +469,7 @@ const updateQuiz = asyncHandler(async (req, res) => {
     type,
     entries,
     status,
+    startTime,
   } = req.body;
 
   try {
@@ -508,6 +514,7 @@ const updateQuiz = asyncHandler(async (req, res) => {
       ...(entries && { entries: String(entries) }),
       ...(type && { type }),
       ...(status && { status }),
+      ...(startTime && { startTime }),
     };
 
     const updatedQuiz = await Quiz.findByIdAndUpdate(quiz_id, updateFields, {
@@ -570,6 +577,138 @@ const getAllQuizFromQuizCatId = asyncHandler(async (req, res) => {
   }
 });
 
+const policyUpdate = async (req, res) => {
+  try {
+    const { type, content } = req.body;
+    if (!type || !content) {
+      return res
+        .status(400)
+        .json({ message: "Type and content are required", status: false });
+    }
+
+    let policy = await Policy.findOne({ type });
+    if (policy) {
+      policy.content = content;
+      await policy.save();
+      return res
+        .status(200)
+        .json({ message: "Policy updated successfully", status: true, policy });
+    } else {
+      policy = new Policy({ type, content });
+      await policy.save();
+      return res
+        .status(200)
+        .json({ message: "Policy created successfully", status: true, policy });
+    }
+  } catch (error) {
+    console.error("Error updating policy:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+      error: error.message,
+    });
+  }
+};
+
+const getPolicy = async (req, res) => {
+  try {
+    const { type } = req.query;
+    if (!type) {
+      return res
+        .status(400)
+        .json({ message: "Policy type is required", status: false });
+    }
+
+    const policy = await Policy.findOne({ type });
+    if (!policy) {
+      return res
+        .status(404)
+        .json({ message: "Policy not found", status: false });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Policy fetched successfully", status: true, policy });
+  } catch (error) {
+    console.error("Error fetching policy:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      status: false,
+      error: error.message,
+    });
+  }
+};
+
+const addFAQ = async (req, res) => {
+  try {
+    const { question, answer, category } = req.body;
+
+    if (!question || !answer) {
+      return res.status(400).json({ message: "Question and answer are required." });
+    }
+
+    const newFAQ = new FAQ({
+      question,
+      answer,
+      category,
+    });
+
+    await newFAQ.save();
+
+    res.status(200).json({ message: "FAQ added successfully", faq: newFAQ });
+  } catch (error) {
+    console.error("Error adding FAQ:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const updateFAQ = async (req, res) => {
+  try {
+    const { question, answer, category, isActive, id } = req.body;
+
+    const updatedFAQ = await FAQ.findByIdAndUpdate(
+      id,
+      { question, answer, category, isActive },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedFAQ) {
+      return res.status(404).json({ message: "FAQ not found" });
+    }
+
+    res.status(200).json({ message: "FAQ updated successfully", faq: updatedFAQ });
+  } catch (error) {
+    console.error("Error updating FAQ:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getAllFAQs = async (req, res) => {
+  try {
+    const faqs = await FAQ.find().sort({ createdAt: -1 });
+    res.status(200).json({ faqs, message: "FAQ fetch successfully" });
+  } catch (error) {
+    console.error("Error fetching FAQs:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getFAQById = async (req, res) => {
+  try {
+    const { id } = req.query;
+    const faq = await FAQ.findById(id);
+
+    if (!faq) {
+      return res.status(404).json({ message: "FAQ not found" });
+    }
+
+    res.status(200).json({ faq, message: "FAQ fetch successfully" });
+  } catch (error) {
+    console.error("Error fetching FAQ:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
   adminSignup,
   loginAdmin,
@@ -586,4 +725,10 @@ module.exports = {
   deleteSpecificQuiz,
   updateQuiz,
   getAllQuizFromQuizCatId,
+  policyUpdate,
+  getPolicy,
+  addFAQ,
+  updateFAQ,
+  getAllFAQs,
+  getFAQById,
 };
