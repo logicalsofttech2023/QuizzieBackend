@@ -333,13 +333,11 @@ const getUserDetail = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching user details:", error);
-    return res
-      .status(500)
-      .json({
-        status: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 });
 
@@ -413,7 +411,7 @@ const submitQuizResult = asyncHandler(async (req, res) => {
         incorrectStreak = 0;
 
         if (correctStreak > 1) {
-          streakBonus += 0.5; // +0.5 for each correct after the first in the streak
+          streakBonus += 0.5;
         }
       } else {
         baseScore -= 2;
@@ -428,6 +426,8 @@ const submitQuizResult = asyncHandler(async (req, res) => {
     }
 
     const attemptedCount = questions.length - notAttemptedCount;
+    const completionPercentage = ((attemptedCount / questions.length) * 100).toFixed(2);
+
 
     let bonusPoints = 0;
 
@@ -454,21 +454,13 @@ const submitQuizResult = asyncHandler(async (req, res) => {
       streakBonus,
       bonusPoints,
       answers: processedAnswers,
+      completionPercentage,
     });
 
     return res.status(200).json({
       status: true,
       message: "Quiz submitted successfully",
-      result: {
-        score: totalScore,
-        correctCount,
-        incorrectCount,
-        notAttemptedCount,
-        streakBonus,
-        bonusPoints,
-        answers: processedAnswers,
-        savedResult: quizResult,
-      },
+      result: quizResult,
     });
   } catch (err) {
     console.error("Error submitting quiz result:", err);
@@ -551,8 +543,6 @@ const getQuizByStatus = asyncHandler(async (req, res) => {
     if (quiz_id) filter._id = quiz_id;
 
     const allQuizzes = await Quiz.find(filter).sort({ createdAt: -1 });
-
-
 
     if (allQuizzes.length === 0) {
       return res.status(404).json({
@@ -868,7 +858,6 @@ const joinQuiz = asyncHandler(async (req, res) => {
       status: true,
       message: "You have successfully joined the quiz",
     });
-
   } catch (err) {
     console.error("Error joining quiz:", err);
     return res.status(500).json({
@@ -879,10 +868,6 @@ const joinQuiz = asyncHandler(async (req, res) => {
     });
   }
 });
-
-
-
-
 
 module.exports = {
   generateOtp,

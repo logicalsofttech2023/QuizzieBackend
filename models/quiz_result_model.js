@@ -55,6 +55,10 @@ const quizResultSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  completionPercentage: {
+    type: Number,
+    default: 0,
+  },
   answers: [answerSchema]
 }, { timestamps: true, versionKey: false });
 
