@@ -11,6 +11,9 @@ const { notFound, errorHandler } = require('./middlewares/error_handler');
 const morgan = require('morgan');
 const cors = require("cors");
 const path = require('path');
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./swagger/swaggerConfig");
+
 
 const PORT = process.env.PORT || 4444;
 dbConnect();
@@ -35,6 +38,17 @@ app.use('/api/admin', adminRoutes);
 
 app.use('/api', dashboardRouter);
 app.use('/api/avatar', avatarRouter);
+
+// sweger api
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  })
+);
 
 // Serve React build
 app.use(express.static(path.join(__dirname, './client/build')));

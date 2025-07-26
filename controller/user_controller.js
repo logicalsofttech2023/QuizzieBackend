@@ -9,12 +9,12 @@ const Question = require("../models/question_model");
 const Quiz = require("../models/quiz_model");
 const QuizResult = require("../models/quiz_result_model");
 const Transaction = require("../models/TransactionModel");
-
 const crypto = require("crypto");
-
+const { addNotification } = require("../utils/AddNotification");
+const { default: Notification } = require("../models/NotificationModel");
 const generateTransactionId = () => {
-  const randomString = crypto.randomBytes(5).toString("hex").toUpperCase(); // 10 characters
-  const formattedId = `QV${randomString.match(/.{1,2}/g).join("")}`; // PJ + split into 2-char groups
+  const randomString = crypto.randomBytes(5).toString("hex").toUpperCase();
+  const formattedId = `QV${randomString.match(/.{1,2}/g).join("")}`;
   return formattedId;
 };
 
@@ -216,6 +216,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
 const updateUser = asyncHandler(async (req, res) => {
   const user_id = req.user.id;
+  const { firstname, lastname, userEmail } = req.body;
+
   try {
     // Check if the provided user_id is a valid ObjectId
     if (!validateMongoDbId(user_id)) {
@@ -227,8 +229,9 @@ const updateUser = asyncHandler(async (req, res) => {
     }
 
     const updateFields = {
-      firstname: req.body.firstname,
-      lastname: req.body.lastname,
+      firstname: firstname,
+      lastname: lastname,
+      userEmail: userEmail,
     };
 
     const updatedUser = await User.findByIdAndUpdate(user_id, updateFields, {
@@ -426,8 +429,10 @@ const submitQuizResult = asyncHandler(async (req, res) => {
     }
 
     const attemptedCount = questions.length - notAttemptedCount;
-    const completionPercentage = ((attemptedCount / questions.length) * 100).toFixed(2);
-
+    const completionPercentage = (
+      (attemptedCount / questions.length) *
+      100
+    ).toFixed(2);
 
     let bonusPoints = 0;
 
@@ -869,6 +874,50 @@ const joinQuiz = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllTransactionsByUser = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const transactions = await Transaction.find({ userId }).sort({
+      createdAt: -1,
+    });
+    return res.status(200).json({
+      code: 200,
+      status: true,
+      transactions,
+    });
+  } catch (err) {
+    console.error("Error fetching transactions:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+const getAllNotificationsByUser = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const notifications = await Notification.find({ userId }).sort({
+      createdAt: -1,
+    });
+    return res.status(200).json({
+      code: 200,
+      status: true,
+      notifications,
+    });
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
 module.exports = {
   generateOtp,
   verifyOtp,
@@ -884,4 +933,7 @@ module.exports = {
   getAllQuestionsByQuizId,
   addMoneyToWallet,
   getAllQuiz,
+  getAllTransactionsByUser,
+  getAllNotificationsByUser,
+  updateUser,
 };
