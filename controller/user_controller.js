@@ -15,6 +15,7 @@ const Notification = require("../models/NotificationModel");
 const Kyc = require("../models/Kyc");
 const ReferralSettings = require("../models/ReferralSettings");
 const Review = require("../models/Review");
+const QuizStreak = require("../models/QuizStreak");
 const generateTransactionId = () => {
   const randomString = crypto.randomBytes(5).toString("hex").toUpperCase();
   const formattedId = `QV${randomString.match(/.{1,2}/g).join("")}`;
@@ -948,6 +949,9 @@ const joinQuiz = asyncHandler(async (req, res) => {
       }).save();
     }
 
+    // ✅ Call Streak Handler
+    const { streak, reward } = await handleStreak(user_id, currentDateTime);
+
     // Question skip logic
     const questionTimeSec = 10; // each question 10 sec
     const totalQuestions = await Question.countDocuments({ quiz: quiz._id });
@@ -993,6 +997,8 @@ const joinQuiz = asyncHandler(async (req, res) => {
       message: isAlreadyJoined
         ? "You have already joined. Please wait for the quiz to start."
         : "You have successfully joined the quiz. Please wait for it to start.",
+        streak,
+        reward
     });
   } catch (err) {
     console.error("Error joining quiz:", err);
@@ -1462,6 +1468,58 @@ const addReview = asyncHandler(async (req, res) => {
   });
 });
 
+const getUserTransaction = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const transactions = await Transaction.find({ userId }).sort({
+      createdAt: -1,
+    });
+    if (!transactions || transactions.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No transactions found",
+      });
+    }
+
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Transactions fetched successfully",
+      count: transactions.length,
+      transactions,
+    });
+  } catch (error) {
+    console.error("Error in getUserTransaction:", error);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Server error",
+    });
+  }
+});
+
+const getStreak = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const streak = await QuizStreak.findOne({ userId });
+
+  if (!streak) {
+    return res.status(404).json({
+      code: 404,
+      status: false,
+      message: "Streak data not found",
+    });
+  }
+
+  res.status(200).json({
+    code: 200,
+    status: true,
+    data: streak,
+  });
+});
+
 module.exports = {
   generateOtp,
   verifyOtp,
@@ -1489,4 +1547,6 @@ module.exports = {
   getMyNotification,
   getUserStats,
   addReview,
+  getUserTransaction,
+  getStreak,
 };

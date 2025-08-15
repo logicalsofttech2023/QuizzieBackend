@@ -26,6 +26,8 @@ const {
   getMyNotification,
   getUserStats,
   addReview,
+  getUserTransaction,
+  getStreak,
 } = require("../controller/user_controller");
 const { authMiddleware } = require("../middlewares/auth_middleware");
 const { getPolicy, getAllFAQs } = require("../controller/adminController");
@@ -618,7 +620,7 @@ router.get("/addMoneyToWallet", authMiddleware, addMoneyToWallet);
  *                 error:
  *                   type: string
  */
-router.get("/getPolicy", authMiddleware, getPolicy);
+router.get("/getPolicy", getPolicy);
 
 /**
  * @swagger
@@ -695,10 +697,10 @@ router.post("/addKycDetails", authMiddleware, kycUploads,  addKycDetails);
 router.get("/getMyKyc", authMiddleware, getMyKyc);
 router.post("/updateKycDetails", authMiddleware, kycUploads, updateKycDetails);
 router.get("/getUserReferralCode", authMiddleware, getUserReferralCode);
-
 router.get("/getMyNotification", authMiddleware, getMyNotification);
 router.get("/getUserStats", authMiddleware, getUserStats);
 router.post("/addReview", authMiddleware, addReview);
-
+router.get("/getUserTransaction", authMiddleware, getUserTransaction);
+router.get("/getUserStreak", authMiddleware, getStreak);
 
 module.exports = router;

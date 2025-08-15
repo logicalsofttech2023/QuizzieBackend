@@ -14,6 +14,7 @@ const Kyc = require("../models/Kyc");
 const ReferralSettings = require("../models/ReferralSettings");
 const Review = require("../models/Review");
 const QuizResult = require("../models/quiz_result_model");
+const ContactUs = require("../models/Contact");
 
 
 function calculateEndTime(startTime, totalQuestions) {
@@ -1281,6 +1282,77 @@ const getAllReviews = async (req, res) => {
   }
 };
 
+// ContactUs Controllers
+const addOrUpdateContactUs = async (req, res) => {
+  try {
+    const { id, officeLocation, email, phone } = req.body;
+
+    if (!officeLocation || !email || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    // If `id` is provided, update the existing document
+    if (id) {
+      const updatedContact = await ContactUs.findByIdAndUpdate(
+        id,
+        { officeLocation, email, phone },
+        { new: true }
+      );
+
+      if (!updatedContact) {
+        return res.status(404).json({
+          success: false,
+          message: "ContactUs not found",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "ContactUs updated successfully",
+        data: updatedContact,
+      });
+    }
+
+    // Check if a ContactUs document already exists
+    const existing = await ContactUs.findOne();
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only one ContactUs document is allowed. Please update the existing one.",
+        data: existing,
+      });
+    }
+
+    // Create new ContactUs document
+    const newContactUs = new ContactUs({ officeLocation, email, phone });
+    await newContactUs.save();
+
+    res.status(200).json({
+      success: true,
+      message: "ContactUs added successfully",
+      data: newContactUs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const getContactUs = async (req, res) => {
+  try {
+    const contactUs = await ContactUs.findOne();
+    res.status(200).json({ success: true, data: contactUs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   adminSignup,
   loginAdmin,
@@ -1314,4 +1386,6 @@ module.exports = {
   updateReferralBonus,
   getReferralSettings,
   getAllReviews,
+  addOrUpdateContactUs,
+  getContactUs,
 };

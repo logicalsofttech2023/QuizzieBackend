@@ -34,9 +34,15 @@ const {
   getReferralSettings,
   updateReferralBonus,
   getAllReviews,
+  getContactUs,
+  addOrUpdateContactUs,
 } = require("../controller/adminController");
 
 const { adminMiddleware } = require("../middlewares/adminMiddleware");
+const Quiz = require("../models/quiz_model");
+const Question = require("../models/question_model");
+const quizData = require('../quizData.json');
+
 
 /**
  * @swagger
@@ -440,7 +446,7 @@ router.put("/updateUserBlockStatus", adminMiddleware, updateUserBlockStatus);
  *                 policy:
  *                   type: object
  */
-router.put("/policyUpdate", adminMiddleware, policyUpdate);
+router.post("/policyUpdate", policyUpdate);
 
 /**
  * @swagger
@@ -1064,7 +1070,54 @@ router.get("/getReferralSettings", adminMiddleware, getReferralSettings);
 router.post("/updateReferralBonus", adminMiddleware, updateReferralBonus);
 
 router.get("/getAllReviews", adminMiddleware, getAllReviews);
+router.get("/getContactUs", adminMiddleware, getContactUs);
+router.post("/addOrUpdateContactUs", adminMiddleware, addOrUpdateContactUs);
 
+
+
+router.post('/seedquizzes', async (req, res) => {
+  try {
+    // Clear existing data (optional)
+    await Quiz.deleteMany({});
+    await Question.deleteMany({});
+
+    // Insert new data
+    const createdQuizzes = [];
+    
+    for (const quiz of quizData.quizzes) {
+      // Create quiz without questions first
+      const { questions, ...quizData } = quiz;
+      const newQuiz = await Quiz.create(quizData);
+      createdQuizzes.push(newQuiz);
+
+      // Create questions for this quiz
+      const questionPromises = questions.map(question => {
+        return Question.create({
+          quiz: newQuiz._id,
+          question: question.question,
+          options: question.options,
+          correctOptionIndex: question.correctOptionIndex
+        });
+      });
+
+      await Promise.all(questionPromises);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Database seeded successfully',
+      data: createdQuizzes
+    });
+
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error seeding database',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;
 

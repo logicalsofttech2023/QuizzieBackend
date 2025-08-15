@@ -1,0 +1,313 @@
+{
+  "quizzes": [
+    {
+      "title": "Mega Quiz - General Knowledge",
+      "description": "Test your general knowledge with this mega quiz!",
+      "prize": "1000",
+      "date": "2025-08-16T00:00:00.000+00:00",
+      "startTime": "12:00:00 PM",
+      "entries": "100",
+      "joiningAmount": "50",
+      "type": "Mega_Quiz",
+      "status": "upcoming",
+      "questions": [
+        {
+          "question": "What is the capital of France?",
+          "options": ["London", "Paris", "Berlin", "Madrid"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which planet is known as the Red Planet?",
+          "options": ["Venus", "Mars", "Jupiter", "Saturn"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Who painted the Mona Lisa?",
+          "options": ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Michelangelo"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "What is the largest ocean on Earth?",
+          "options": ["Atlantic", "Indian", "Arctic", "Pacific"],
+          "correctOptionIndex": 3
+        },
+        {
+          "question": "Which country is home to the kangaroo?",
+          "options": ["New Zealand", "South Africa", "Australia", "Brazil"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "What is the chemical symbol for gold?",
+          "options": ["Go", "Gd", "Au", "Ag"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Which year did World War II end?",
+          "options": ["1943", "1945", "1947", "1950"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "What is the tallest mountain in the world?",
+          "options": ["K2", "Mount Kilimanjaro", "Mount Everest", "Makalu"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Which language is the most widely spoken in the world?",
+          "options": ["English", "Mandarin Chinese", "Spanish", "Hindi"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "What is the largest mammal in the world?",
+          "options": ["Elephant", "Blue Whale", "Giraffe", "Polar Bear"],
+          "correctOptionIndex": 1
+        }
+      ]
+    },
+    {
+      "title": "Special Quiz - Science",
+      "description": "A special science quiz for enthusiasts",
+      "prize": "500",
+      "date": "2025-08-16T00:00:00.000+00:00",
+      "startTime": "03:00:00 PM",
+      "entries": "50",
+      "joiningAmount": "20",
+      "type": "Special_Quiz",
+      "status": "upcoming",
+      "questions": [
+        {
+          "question": "What is the chemical formula for water?",
+          "options": ["HO", "H2O", "H2O2", "HO2"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which gas do plants absorb from the atmosphere?",
+          "options": ["Oxygen", "Carbon Dioxide", "Nitrogen", "Hydrogen"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "What is the hardest natural substance on Earth?",
+          "options": ["Gold", "Iron", "Diamond", "Quartz"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "What is the study of fossils called?",
+          "options": ["Paleontology", "Archaeology", "Geology", "Meteorology"],
+          "correctOptionIndex": 0
+        },
+        {
+          "question": "Which planet is closest to the Sun?",
+          "options": ["Venus", "Earth", "Mercury", "Mars"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "What is the human body's largest organ?",
+          "options": ["Liver", "Brain", "Skin", "Heart"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Which scientist developed the theory of relativity?",
+          "options": ["Isaac Newton", "Albert Einstein", "Galileo Galilei", "Stephen Hawking"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "What is the pH value of pure water?",
+          "options": ["5", "7", "9", "11"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which blood type is the universal donor?",
+          "options": ["A", "B", "AB", "O"],
+          "correctOptionIndex": 3
+        },
+        {
+          "question": "What is the speed of light in a vacuum?",
+          "options": ["300,000 km/s", "150,000 km/s", "450,000 km/s", "600,000 km/s"],
+          "correctOptionIndex": 0
+        }
+      ]
+    },
+    {
+      "title": "Lite Quiz - Entertainment",
+      "description": "A light quiz about movies and music",
+      "prize": "300",
+      "date": "2025-08-16T00:00:00.000+00:00",
+      "startTime": "06:00:00 PM",
+      "entries": "30",
+      "joiningAmount": "10",
+      "type": "Lite_Quiz",
+      "status": "upcoming",
+      "questions": [
+        {
+          "question": "Who directed the movie Titanic?",
+          "options": ["Steven Spielberg", "James Cameron", "Christopher Nolan", "Martin Scorsese"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which band was Freddie Mercury the lead singer of?",
+          "options": ["The Beatles", "Queen", "Rolling Stones", "Pink Floyd"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which movie won the first Academy Award for Best Picture?",
+          "options": ["Gone with the Wind", "Sunrise", "Wings", "The Jazz Singer"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Who played Jack Sparrow in Pirates of the Caribbean?",
+          "options": ["Brad Pitt", "Johnny Depp", "Leonardo DiCaprio", "Tom Cruise"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which artist released the album 'Thriller'?",
+          "options": ["Prince", "Michael Jackson", "Madonna", "Whitney Houston"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "What is the highest-grossing film of all time?",
+          "options": ["Avatar", "Avengers: Endgame", "Titanic", "Star Wars: The Force Awakens"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which TV show features the characters Ross, Rachel, and Chandler?",
+          "options": ["The Office", "Friends", "How I Met Your Mother", "Seinfeld"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Who is known as the 'King of Pop'?",
+          "options": ["Elvis Presley", "Michael Jackson", "Justin Bieber", "Bruno Mars"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which Shakespeare play features the characters Romeo and Juliet?",
+          "options": ["Macbeth", "Hamlet", "Romeo and Juliet", "Othello"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Which artist painted 'The Starry Night'?",
+          "options": ["Pablo Picasso", "Vincent van Gogh", "Salvador Dalí", "Claude Monet"],
+          "correctOptionIndex": 1
+        }
+      ]
+    },
+    {
+      "title": "Small Battle Quiz - Sports",
+      "description": "Test your sports knowledge in this quick battle",
+      "prize": "200",
+      "date": "2025-08-16T00:00:00.000+00:00",
+      "startTime": "08:00:00 PM",
+      "entries": "20",
+      "joiningAmount": "15",
+      "type": "Small_Battle_Quiz",
+      "status": "upcoming",
+      "questions": [
+        {
+          "question": "Which country won the 2018 FIFA World Cup?",
+          "options": ["Germany", "Brazil", "France", "Argentina"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "In which sport would you perform a slam dunk?",
+          "options": ["Tennis", "Basketball", "Volleyball", "Badminton"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "How many players are on a baseball team?",
+          "options": ["9", "11", "7", "5"],
+          "correctOptionIndex": 0
+        },
+        {
+          "question": "Which country hosted the 2016 Summer Olympics?",
+          "options": ["China", "Brazil", "Russia", "UK"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "What is the maximum score in a single frame of snooker?",
+          "options": ["100", "147", "155", "180"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which tennis player has won the most Grand Slam titles?",
+          "options": ["Roger Federer", "Rafael Nadal", "Novak Djokovic", "Margaret Court"],
+          "correctOptionIndex": 3
+        },
+        {
+          "question": "In cricket, how many balls are in an over?",
+          "options": ["4", "6", "8", "10"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which country invented the sport of golf?",
+          "options": ["USA", "England", "Scotland", "Ireland"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Which athlete holds the world record in the 100m dash?",
+          "options": ["Usain Bolt", "Carl Lewis", "Justin Gatlin", "Asafa Powell"],
+          "correctOptionIndex": 0
+        },
+        {
+          "question": "Which sport uses terms like 'love' and 'deuce'?",
+          "options": ["Badminton", "Table Tennis", "Tennis", "Squash"],
+          "correctOptionIndex": 2
+        }
+      ]
+    },
+    {
+      "title": "Practice Quiz - Mixed Topics",
+      "description": "Practice with questions from various topics",
+      "type": "Practice_Quiz",
+      "questions": [
+        {
+          "question": "Which language runs in a web browser?",
+          "options": ["Java", "C", "Python", "JavaScript"],
+          "correctOptionIndex": 3
+        },
+        {
+          "question": "What does HTML stand for?",
+          "options": ["Hypertext Markup Language", "Hyperlinks and Text Markup Language", "Home Tool Markup Language", "Hyper Transfer Markup Language"],
+          "correctOptionIndex": 0
+        },
+        {
+          "question": "Which of these is not a programming language?",
+          "options": ["Ruby", "Python", "HTML", "Java"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "What is the main component of the Sun?",
+          "options": ["Liquid lava", "Hydrogen", "Oxygen", "Carbon"],
+          "correctOptionIndex": 1
+        },
+        {
+          "question": "Which planet has the most moons?",
+          "options": ["Earth", "Jupiter", "Saturn", "Mars"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "What is the largest country by area?",
+          "options": ["Canada", "China", "USA", "Russia"],
+          "correctOptionIndex": 3
+        },
+        {
+          "question": "Which of these is not a primary color?",
+          "options": ["Red", "Blue", "Green", "Yellow"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "How many continents are there?",
+          "options": ["5", "6", "7", "8"],
+          "correctOptionIndex": 2
+        },
+        {
+          "question": "Which animal is known as the 'Ship of the Desert'?",
+          "options": ["Camel", "Elephant", "Horse", "Donkey"],
+          "correctOptionIndex": 0
+        },
+        {
+          "question": "Which is the longest river in the world?",
+          "options": ["Amazon", "Nile", "Yangtze", "Mississippi"],
+          "correctOptionIndex": 1
+        }
+      ]
+    }
+  ]
+}
