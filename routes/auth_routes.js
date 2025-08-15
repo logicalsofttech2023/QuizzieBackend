@@ -17,9 +17,26 @@ const {
   getAllTransactionsByUser,
   getAllNotificationsByUser,
   updateUser,
+  joinQuiz,
+  getTodayQuiz,
+  addKycDetails,
+  updateKycDetails,
+  getMyKyc,
+  getUserReferralCode,
+  getMyNotification,
+  getUserStats,
+  addReview,
 } = require("../controller/user_controller");
-const { authMiddleware, isAdmin } = require("../middlewares/auth_middleware");
+const { authMiddleware } = require("../middlewares/auth_middleware");
 const { getPolicy, getAllFAQs } = require("../controller/adminController");
+const upload = require("../middlewares/uploadMiddleware");
+
+const kycUploads = upload.fields([
+    { name: "aadharFrontImg", maxCount: 1 },
+    { name: "aadharBackImg", maxCount: 1 },
+    { name: "panFrontImg", maxCount: 1 },
+    { name: "panBackImg", maxCount: 1 }
+]);
 
 /**
  * @swagger
@@ -194,7 +211,7 @@ router.post("/resendOtp", resendOtp);
  *                 result:
  *                   type: object
  */
-router.post("/registerUser", registerUser);
+router.post("/registerUser", upload.single("profilePic"), registerUser);
 
 /**
  * @swagger
@@ -264,7 +281,7 @@ router.get("/getUserDetail", authMiddleware, getUserDetail);
  *                 updatedUser:
  *                   type: object
  */
-router.post("/updateUser", authMiddleware, updateUser);
+router.post("/updateUser", authMiddleware, upload.single("profilePic"), updateUser);
 
 /**
  * @swagger
@@ -670,5 +687,18 @@ router.get("/getAllTransactionsByUser", authMiddleware, getAllTransactionsByUser
  *                     type: object
  */
 router.get("/getAllNotificationsByUser", authMiddleware, getAllNotificationsByUser);
+
+
+router.post("/joinQuiz", authMiddleware, joinQuiz);
+router.get("/getTodayQuiz", authMiddleware, getTodayQuiz);
+router.post("/addKycDetails", authMiddleware, kycUploads,  addKycDetails);
+router.get("/getMyKyc", authMiddleware, getMyKyc);
+router.post("/updateKycDetails", authMiddleware, kycUploads, updateKycDetails);
+router.get("/getUserReferralCode", authMiddleware, getUserReferralCode);
+
+router.get("/getMyNotification", authMiddleware, getMyNotification);
+router.get("/getUserStats", authMiddleware, getUserStats);
+router.post("/addReview", authMiddleware, addReview);
+
 
 module.exports = router;

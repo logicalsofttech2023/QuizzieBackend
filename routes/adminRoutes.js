@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const { authMiddleware } = require("../middlewares/auth_middleware");
 
 const {
   adminSignup,
@@ -23,15 +22,20 @@ const {
   updateFAQ,
   getAllFAQs,
   getFAQById,
-} = require("../controller/adminController");
-
-const {
   createQuestion,
   getSpecificQuestion,
   deleteSpecificQuestion,
   updateQuestion,
   getAllQuestionsFromQuizId,
-} = require("../controller/question_controller");
+  getAllTransaction,
+  getAllPracticeQuizInAdmin,
+  updateKycStatus,
+  getUserDetailsById,
+  getReferralSettings,
+  updateReferralBonus,
+  getAllReviews,
+} = require("../controller/adminController");
+
 const { adminMiddleware } = require("../middlewares/adminMiddleware");
 
 /**
@@ -931,7 +935,11 @@ router.get("/getSpecificQuestion", adminMiddleware, getSpecificQuestion);
  *                 message:
  *                   type: string
  */
-router.delete("/deleteSpecificQuestion", adminMiddleware, deleteSpecificQuestion);
+router.delete(
+  "/deleteSpecificQuestion",
+  adminMiddleware,
+  deleteSpecificQuestion
+);
 
 /**
  * @swagger
@@ -1016,7 +1024,47 @@ router.put("/updateQuestion", adminMiddleware, updateQuestion);
  *                   items:
  *                     type: object
  */
-router.get("/getAllQuestionsFromQuizId", adminMiddleware, getAllQuestionsFromQuizId);
+router.get(
+  "/getAllQuestionsFromQuizId",
+  adminMiddleware,
+  getAllQuestionsFromQuizId
+);
+
+/**
+ * @swagger
+ * /api/admin/getAllTransaction:
+ *   get:
+ *     summary: Get all transaction history
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Transaction history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transactions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 message:
+ *                   type: string
+ */
+router.get("/getAllTransaction", adminMiddleware, getAllTransaction);
+
+router.get("/getAllPracticeQuiz", adminMiddleware, getAllPracticeQuizInAdmin);
+
+router.post("/updateKycStatus", adminMiddleware, updateKycStatus);
+
+router.get("/getUserDetailsById", adminMiddleware, getUserDetailsById);
+router.get("/getReferralSettings", adminMiddleware, getReferralSettings);
+router.post("/updateReferralBonus", adminMiddleware, updateReferralBonus);
+
+router.get("/getAllReviews", adminMiddleware, getAllReviews);
+
 
 module.exports = router;
 

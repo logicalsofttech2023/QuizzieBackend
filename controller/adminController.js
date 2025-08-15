@@ -9,6 +9,38 @@ const User = require("../models/user_model");
 const Admin = require("../models/AdminModel");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const lodash = require("lodash");
+const Kyc = require("../models/Kyc");
+const ReferralSettings = require("../models/ReferralSettings");
+const Review = require("../models/Review");
+const QuizResult = require("../models/quiz_result_model");
+
+
+function calculateEndTime(startTime, totalQuestions) {
+  if (!startTime || !totalQuestions) return null;
+  const time12to24 = (time12h) => {
+    const [time, period] = time12h.split(" ");
+    let [hours, minutes, seconds] = time.split(":").map(Number);
+    if (period === "PM" && hours < 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+    return { hours, minutes, seconds };
+  };
+  const time24to12 = (hours, minutes, seconds) => {
+    const period = hours >= 12 ? "PM" : "AM";
+    const twelveHour = hours % 12 || 12;
+    return `${String(twelveHour).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")} ${period}`;
+  };
+  const { hours, minutes, seconds } = time12to24(startTime);
+  let totalSeconds = hours * 3600 + minutes * 60 + seconds;
+  totalSeconds += totalQuestions * 10; // Add 10s per question
+  let endHours = Math.floor(totalSeconds / 3600) % 24;
+  let endMinutes = Math.floor((totalSeconds % 3600) / 60);
+  let endSeconds = totalSeconds % 60;
+  return time24to12(endHours, endMinutes, endSeconds);
+}
 
 const generateJwtToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -183,13 +215,14 @@ const getAllUsers = asyncHandler(async (req, res) => {
   try {
     const { search = "", page = 1, limit = 10 } = req.query;
 
-    let searchFilter = {};
+    let searchFilter = { role: "user", firstname: { $exists: true, $ne: "" } };
     if (search) {
       searchFilter = {
         $or: [
-          { name: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } }
-        ]
+          { firstname: { $regex: search, $options: "i" } },
+          { lastname: { $regex: search, $options: "i" } },
+          { userEmail: { $regex: search, $options: "i" } },
+        ],
       };
     }
 
@@ -201,14 +234,14 @@ const getAllUsers = asyncHandler(async (req, res) => {
         .limit(parseInt(limit))
         .sort({ createdAt: -1 }),
 
-      User.countDocuments(searchFilter)
+      User.countDocuments(searchFilter),
     ]);
 
     if (users.length === 0) {
       return res.status(404).json({
         code: 404,
         status: false,
-        message: "No users found"
+        message: "No users found",
       });
     }
 
@@ -218,16 +251,15 @@ const getAllUsers = asyncHandler(async (req, res) => {
       users,
       total,
       page: parseInt(page),
-      totalPages: Math.ceil(total / parseInt(limit))
+      totalPages: Math.ceil(total / parseInt(limit)),
     });
-
   } catch (err) {
     console.error("Error fetching users:", err);
     res.status(500).json({
       code: 500,
       status: false,
       message: "Internal server error",
-      error: err.message
+      error: err.message,
     });
   }
 });
@@ -330,18 +362,30 @@ const createQuiz = asyncHandler(async (req, res) => {
     status,
     startTime,
   } = req.body;
+  console.log(req.body);
 
   // Basic validation
-  if (!title || !prize || !date || joiningAmount == null || !type || !startTime) {
+  if (!title || !type) {
     return res.status(400).json({
       code: 400,
       status: false,
-      message: "Required fields: title, prize, date, startTime, joiningAmount",
+      message: "Required fields: title and type",
     });
   }
 
+  // Special case for Practice_Quiz
+  if (type !== "Practice_Quiz") {
+    if (!prize || !date || joiningAmount == null || !startTime) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message:
+          "Required fields: prize, date, startTime, joiningAmount for non-Practice Quizzes",
+      });
+    }
+  }
+
   try {
-    // Check for existing quiz with the same title
     const existingQuiz = await Quiz.findOne({ title });
     if (existingQuiz) {
       return res.status(409).json({
@@ -351,18 +395,23 @@ const createQuiz = asyncHandler(async (req, res) => {
       });
     }
 
-    // Create and save the new quiz
-    const newQuiz = await Quiz.create({
+    const newQuizData = {
       title,
       description,
-      prize,
-      date,
-      entries: entries || 0,
-      joiningAmount,
       type,
-      status,
-      startTime,
-    });
+    };
+
+    // Add other fields only if not Practice_Quiz
+    if (type !== "Practice_Quiz") {
+      newQuizData.prize = prize;
+      newQuizData.date = date;
+      newQuizData.entries = entries || 0;
+      newQuizData.joiningAmount = joiningAmount;
+      newQuizData.status = status;
+      newQuizData.startTime = startTime;
+    }
+
+    const newQuiz = await Quiz.create(newQuizData);
 
     return res.status(201).json({
       code: 201,
@@ -383,17 +432,101 @@ const createQuiz = asyncHandler(async (req, res) => {
 
 const getAllQuizInAdmin = asyncHandler(async (req, res) => {
   try {
-    const allQuizzes = await Quiz.find().sort({ createdAt: -1 });
+    const { search = "", page = 1, limit = 10 } = req.query;
 
-    if (allQuizzes.length === 0) {
-      return res
-        .status(404)
-        .json({ code: 404, status: false, message: "No quiz found" });
+    let searchFilter = {
+      type: { $ne: "Practice_Quiz" },
+    };
+
+    if (search) {
+      searchFilter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { type: { $regex: search, $options: "i" } },
+      ];
     }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [quizzes, total] = await Promise.all([
+      Quiz.find(searchFilter)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .sort({ createdAt: -1 }),
+      Quiz.countDocuments(searchFilter),
+    ]);
+
+    if (quizzes.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No quiz found",
+      });
+    }
+
     res.json({
       code: 200,
       status: true,
-      quizzes: allQuizzes,
+      quizzes,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (err) {
+    console.error("Error fetching quizzes:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+const getAllPracticeQuizInAdmin = asyncHandler(async (req, res) => {
+  try {
+    const { search = "", page = 1, limit = 10, type } = req.query;
+
+    let searchFilter = {};
+    if (search) {
+      searchFilter = {
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+          { type: { $regex: search, $options: "i" } },
+        ],
+      };
+    }
+
+    if (type) {
+      searchFilter.type = type;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [quizzes, total] = await Promise.all([
+      Quiz.find(searchFilter)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .sort({ createdAt: -1 }),
+      Quiz.countDocuments(searchFilter),
+    ]);
+
+    if (quizzes.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No quiz found",
+      });
+    }
+
+    res.json({
+      code: 200,
+      status: true,
+      quizzes,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (err) {
     console.error("Error fetching quizzes:", err);
@@ -473,7 +606,6 @@ const updateQuiz = asyncHandler(async (req, res) => {
   } = req.body;
 
   try {
-    // Validate ObjectId
     if (!validateMongoDbId(quiz_id)) {
       return res.status(400).json({
         code: 400,
@@ -482,7 +614,6 @@ const updateQuiz = asyncHandler(async (req, res) => {
       });
     }
 
-    // Check if quiz exists
     const quiz = await Quiz.findById(quiz_id);
     if (!quiz) {
       return res.status(404).json({
@@ -492,7 +623,6 @@ const updateQuiz = asyncHandler(async (req, res) => {
       });
     }
 
-    // Check for duplicate title
     if (title && title !== quiz.title) {
       const existingQuiz = await Quiz.findOne({ title });
       if (existingQuiz) {
@@ -504,18 +634,32 @@ const updateQuiz = asyncHandler(async (req, res) => {
       }
     }
 
-    // Prepare update object with sanitized string fields
-    const updateFields = {
-      ...(title && { title }),
-      ...(description && { description }),
-      ...(prize && { prize: String(prize) }),
-      ...(date && { date }),
-      ...(joiningAmount && { joiningAmount: String(joiningAmount) }),
-      ...(entries && { entries: String(entries) }),
-      ...(type && { type }),
-      ...(status && { status }),
-      ...(startTime && { startTime }),
-    };
+    let updateFields = {};
+
+    if (quiz.type === "Practice_Quiz") {
+      // Only allow title & description update
+      if (title) updateFields.title = title;
+      if (description) updateFields.description = description;
+    } else {
+      // Normal quiz update
+      updateFields = {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(prize && { prize: String(prize) }),
+        ...(date && { date }),
+        ...(joiningAmount && { joiningAmount: String(joiningAmount) }),
+        ...(entries && { entries: String(entries) }),
+        ...(type && { type }),
+        ...(status && { status }),
+        ...(startTime && { startTime }),
+      };
+
+      // If startTime is being updated, recalculate endTime
+      if (startTime && startTime !== quiz.startTime) {
+        const totalQuestions = await Question.countDocuments({ quiz: quiz_id });
+        updateFields.endTime = calculateEndTime(startTime, totalQuestions);
+      }
+    }
 
     const updatedQuiz = await Quiz.findByIdAndUpdate(quiz_id, updateFields, {
       new: true,
@@ -538,42 +682,249 @@ const updateQuiz = asyncHandler(async (req, res) => {
   }
 });
 
-const getAllQuizFromQuizCatId = asyncHandler(async (req, res) => {
-  const { quiz_category_id } = req.params;
+const createQuestion = asyncHandler(async (req, res) => {
+  const { quiz_id, question, options, correctOptionIndex } = req.body;
+
   try {
-    // Check if the provided quiz_category_id is a valid ObjectId
-    if (!validateMongoDbId(quiz_category_id)) {
+    // Validate quiz ID
+    if (!validateMongoDbId(quiz_id)) {
+      return res.status(400).json({ message: "Invalid quiz ID format" });
+    }
+
+    // Validate required fields
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({
+        message: "Question and at least two options are required",
+      });
+    }
+
+    if (
+      correctOptionIndex === undefined ||
+      correctOptionIndex < 0 ||
+      correctOptionIndex >= options.length
+    ) {
+      return res.status(400).json({
+        message:
+          "Correct option index must be valid and match one of the options",
+      });
+    }
+
+    // Check for duplicate question in the same quiz
+    const existingQuestion = await Question.findOne({
+      quiz: quiz_id,
+      question: question,
+    });
+
+    if (existingQuestion) {
+      return res.status(400).json({
+        message: "This question already exists for the quiz",
+      });
+    }
+
+    // Create new question
+    const newQuestion = await Question.create({
+      quiz: quiz_id,
+      question,
+      options,
+      correctOptionIndex,
+    });
+
+    const totalQuestions = await Question.countDocuments({ quiz: quiz_id });
+    const quizDoc = await Quiz.findById(quiz_id);
+
+    if (quizDoc && quizDoc.startTime) {
+      quizDoc.endTime = calculateEndTime(quizDoc.startTime, totalQuestions);
+      await quizDoc.save();
+    }
+
+    res.status(201).json({
+      code: 201,
+      status: true,
+      message: "New Question has been added successfully",
+      data: newQuestion,
+    });
+  } catch (err) {
+    console.error("Error creating question:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+const getAllQuestionsFromQuizId = asyncHandler(async (req, res) => {
+  const { quiz_id } = req.query;
+
+  try {
+    // Check if the provided quiz_id is a valid ObjectId
+    if (!validateMongoDbId(quiz_id)) {
       return res.json({
         code: 400,
         status: false,
-        message: "Invalid quiz category id format",
+        message: "Invalid quiz id format",
       });
     }
-    // Find the quiz by Quiz Category ID
-    const allQuizzes = await Quiz.find({ category: quiz_category_id }).populate(
-      "category"
-    );
-    const quizCount = await Quiz.countDocuments({ category: quiz_category_id });
-    if (allQuizzes.length > 0) {
-      const quizzesWithQuestionCount = await Promise.all(
-        allQuizzes.map(async (quiz) => {
-          const questionCount = await Question.countDocuments({
-            quiz: quiz._id,
-          });
-          return { ...quiz.toObject(), questionCount };
-        })
-      );
-      res.json({
-        code: 200,
-        status: true,
-        count: quizCount,
-        quizzes: quizzesWithQuestionCount,
+
+    // Find the quiz by ID
+    const quiz = await Quiz.findById(quiz_id);
+
+    if (!quiz) {
+      return res.json({ code: 404, status: false, message: "Quiz not found" });
+    }
+
+    // Find all questions for the given quiz ID and populate the 'quiz' field in each question
+    const questions = await Question.find({ quiz: quiz_id }).select("-quiz");
+    const randomQuestions = lodash.sampleSize(questions, 10); // Get 10 random questions
+
+    res.json({
+      code: 200,
+      status: true,
+      message: "",
+      quiz: quiz,
+      questions: randomQuestions,
+    });
+  } catch (err) {
+    throw new Error(err);
+  }
+});
+
+const getSpecificQuestion = asyncHandler(async (req, res) => {
+  const { question_id } = req.query;
+  try {
+    // Check if the provided question_id is a valid ObjectId
+    if (!validateMongoDbId(question_id)) {
+      return res.json({
+        code: 400,
+        status: false,
+        message: "Invalid question id format",
       });
+    }
+
+    const question = await Question.findById(question_id).populate("quiz");
+    if (question) {
+      res.json({ code: 200, status: true, message: "", question: question });
     } else {
-      res.json({ code: 404, status: false, message: "No quiz found" });
+      res.json({ code: 404, status: false, message: "Question not found" });
     }
   } catch (err) {
     throw new Error(err);
+  }
+});
+
+const deleteSpecificQuestion = asyncHandler(async (req, res) => {
+  const { question_id } = req.query;
+  try {
+    // Check if the provided question_id is a valid ObjectId
+    if (!validateMongoDbId(question_id)) {
+      return res.json({
+        code: 400,
+        status: false,
+        message: "Invalid question_id format",
+      });
+    }
+
+    const deleteQuestion = await Question.findByIdAndDelete(question_id);
+    if (deleteQuestion) {
+      res.json({
+        code: 200,
+        status: true,
+        message: "Question deleted successfully",
+      });
+    } else {
+      res.json({ code: 404, status: false, message: "Question not found" });
+    }
+  } catch (err) {
+    throw new Error(err);
+  }
+});
+
+const updateQuestion = asyncHandler(async (req, res) => {
+  const { question_id, question, options, correctOptionIndex } = req.body;
+
+  try {
+    // Validate question ID
+    if (!validateMongoDbId(question_id)) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "Invalid question_id format",
+      });
+    }
+
+    // Find the existing question
+    const existingQuestion = await Question.findById(question_id);
+    if (!existingQuestion) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Question not found",
+      });
+    }
+
+    // Validate required fields
+    if (!question || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "Question and at least two options are required",
+      });
+    }
+
+    if (
+      correctOptionIndex === undefined ||
+      correctOptionIndex < 0 ||
+      correctOptionIndex >= options.length
+    ) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "Correct option index must match one of the options",
+      });
+    }
+
+    // Check for duplicate question within the same quiz
+    const duplicate = await Question.findOne({
+      _id: { $ne: question_id },
+      quiz: existingQuestion.quiz,
+      question: question,
+    });
+
+    if (duplicate) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message:
+          "Another question with the same content already exists in this quiz",
+      });
+    }
+
+    // Update and save question
+    existingQuestion.question = question;
+    existingQuestion.options = options;
+    existingQuestion.correctOptionIndex = correctOptionIndex;
+
+    const updatedQuestion = await existingQuestion.save();
+
+    const totalQuestions = await Question.countDocuments({
+      quiz: existingQuestion.quiz,
+    });
+    const quizDoc = await Quiz.findById(existingQuestion.quiz);
+
+    if (quizDoc && quizDoc.startTime) {
+      quizDoc.endTime = calculateEndTime(quizDoc.startTime, totalQuestions);
+      await quizDoc.save();
+    }
+
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Question has been updated successfully",
+      data: updatedQuestion,
+    });
+  } catch (err) {
+    console.error("Error updating question:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal Server Error",
+    });
   }
 });
 
@@ -644,13 +995,14 @@ const addFAQ = async (req, res) => {
     const { question, answer } = req.body;
 
     if (!question || !answer) {
-      return res.status(400).json({ message: "Question and answer are required." });
+      return res
+        .status(400)
+        .json({ message: "Question and answer are required." });
     }
 
     const newFAQ = new FAQ({
       question,
       answer,
-      
     });
 
     await newFAQ.save();
@@ -676,7 +1028,9 @@ const updateFAQ = async (req, res) => {
       return res.status(404).json({ message: "FAQ not found" });
     }
 
-    res.status(200).json({ message: "FAQ updated successfully", faq: updatedFAQ });
+    res
+      .status(200)
+      .json({ message: "FAQ updated successfully", faq: updatedFAQ });
   } catch (error) {
     console.error("Error updating FAQ:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -709,6 +1063,224 @@ const getFAQById = async (req, res) => {
   }
 };
 
+const getAllTransaction = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    // First, find matching user IDs if search keyword is provided
+    let userFilter = {};
+
+    if (search) {
+      const regex = new RegExp(search, "i");
+      const matchingUsers = await User.find({
+        $or: [{ firstname: regex }, { lastname: regex }],
+      }).select("_id");
+
+      const userIds = matchingUsers.map((user) => user._id);
+      userFilter.userId = { $in: userIds };
+    }
+
+    const totalTransactions = await Transaction.countDocuments(userFilter);
+
+    const transactions = await Transaction.find(userFilter)
+      .populate("userId")
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+
+    return res.status(200).json({
+      message: "Transaction history fetched successfully",
+      status: true,
+      totalTransactions,
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalTransactions / limitNum),
+      data: transactions,
+    });
+  } catch (error) {
+    console.error("Error fetching transaction history:", error);
+    return res.status(500).json({
+      message: "Server Error",
+      status: false,
+    });
+  }
+};
+
+const updateKycStatus = async (req, res) => {
+  try {
+    const { userId, status } = req.body;
+
+    // Validate input
+    if (!userId || !status) {
+      return res.status(400).json({
+        status: false,
+        message: "userId and status are required",
+      });
+    }
+
+    const allowedStatuses = ["pending", "approved", "rejected"];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        status: false,
+        message: `Invalid status value. Allowed values: ${allowedStatuses.join(
+          ", "
+        )}`,
+      });
+    }
+
+    // Find and update
+    const kyc = await Kyc.findOneAndUpdate(
+      { userId },
+      { status },
+      { new: true, runValidators: true }
+    );
+
+    if (!kyc) {
+      return res.status(404).json({
+        status: false,
+        message: "KYC record not found for this user",
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "KYC status updated successfully",
+      data: kyc,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+};
+
+const getUserDetailsById = async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    const user = await User.findById(id).lean();
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const kyc = await Kyc.find({ userId: id });
+
+    // 1. Get quizzes the user has joined
+    const joinedQuizzes = await Quiz.find({ users: id })
+      .select("_id title date startTime endTime joiningAmount")
+      .lean();
+
+    // 2. Get quizzes the user has played (results)
+    const playedQuizzes = await QuizResult.find({ user: id })
+      .populate("quiz", "title date startTime endTime")
+      .lean();
+
+    // 3. Attach KYC data
+    user.kyc = kyc;
+
+    return res.status(200).json({
+      success: true,
+      message: "User details fetched successfully",
+      user,
+      joinedQuizzes,
+      playedQuizzes,
+    });
+  } catch (error) {
+    console.error("Error in getUserDetailsById:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching user details",
+      error: error.message,
+    });
+  }
+};
+
+const updateReferralBonus = asyncHandler(async (req, res) => {
+  const { amount } = req.body;
+
+  let settings = await ReferralSettings.findOne();
+  if (!settings) {
+    settings = new ReferralSettings({ referralBonus: amount });
+  } else {
+    settings.referralBonus = amount;
+  }
+  await settings.save();
+
+  res.json({
+    code: 200,
+    status: true,
+    message: "Referral bonus updated successfully",
+    referralBonus: settings.referralBonus,
+  });
+});
+
+const getReferralSettings = asyncHandler(async (req, res) => {
+  const settings = await ReferralSettings.findOne();
+  if (!settings) {
+    return res.status(404).json({
+      code: 404,
+      status: false,
+      message: "Referral settings not found",
+    });
+  }
+  res.json({
+    code: 200,
+    status: true,
+    message: "Referral settings retrieved successfully",
+    data: settings,
+  });
+});
+
+const getAllReviews = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    // First, find matching user IDs if search keyword is provided
+    let userFilter = {};
+
+    if (search) {
+      const regex = new RegExp(search, "i");
+      const matchingUsers = await User.find({
+        $or: [{ firstname: regex }, { lastname: regex }],
+      }).select("_id");
+
+      const userIds = matchingUsers.map((user) => user._id);
+      userFilter.userId = { $in: userIds };
+    }
+
+    const totalReviews = await Review.countDocuments(userFilter);
+
+    const Reviews = await Review.find(userFilter)
+      .populate("userId")
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+
+    return res.status(200).json({
+      message: "Reviews fetched successfully",
+      status: true,
+      totalReviews,
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalReviews / limitNum),
+      data: Reviews,
+    });
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    return res.status(500).json({
+      message: "Server Error",
+      status: false,
+    });
+  }
+};
+
 module.exports = {
   adminSignup,
   loginAdmin,
@@ -724,11 +1296,22 @@ module.exports = {
   getSpecificQuiz,
   deleteSpecificQuiz,
   updateQuiz,
-  getAllQuizFromQuizCatId,
   policyUpdate,
   getPolicy,
   addFAQ,
   updateFAQ,
   getAllFAQs,
   getFAQById,
+  createQuestion,
+  getSpecificQuestion,
+  deleteSpecificQuestion,
+  updateQuestion,
+  getAllQuestionsFromQuizId,
+  getAllTransaction,
+  getAllPracticeQuizInAdmin,
+  updateKycStatus,
+  getUserDetailsById,
+  updateReferralBonus,
+  getReferralSettings,
+  getAllReviews,
 };

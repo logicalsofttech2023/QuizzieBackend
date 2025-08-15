@@ -42,6 +42,15 @@ var userSchema = new mongoose.Schema(
       default:
         "https://res.cloudinary.com/dt6hyafmc/image/upload/v1692392344/Avatars/avatar_8609.png",
     },
+    referralCode: {
+      type: String,
+      unique: true,
+    },
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     wallet: {
       type: String,
       default: 0,

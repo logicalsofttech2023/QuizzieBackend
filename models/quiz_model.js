@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-// Declare the Schema of the Mongo model
 const quizSchema = new mongoose.Schema(
   {
     title: {
@@ -14,15 +13,14 @@ const quizSchema = new mongoose.Schema(
     },
     prize: {
       type: String,
-      required: true,
     },
     date: {
       type: Date,
-      required: true,
     },
     startTime: {
       type: String,
     },
+    endTime: { type: String },
 
     entries: {
       type: String,
@@ -30,16 +28,15 @@ const quizSchema = new mongoose.Schema(
     },
     joiningAmount: {
       type: String,
-      required: true,
     },
     type: {
       type: String,
-      enum: ["Mega Quiz", "Special Quiz", "Lite Quiz"],
+      enum: ["Mega_Quiz", "Special_Quiz", "Lite_Quiz", "Small_Battle_Quiz", "Practice_Quiz"],
       required: true,
     },
     status: {
       type: String,
-      enum: ["upcoming", "completed"],
+      enum: ["upcoming", "completed", "live"],
       default: "upcoming",
     },
     users: {
@@ -51,5 +48,4 @@ const quizSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-// Export the model
 module.exports = mongoose.model("Quiz", quizSchema);

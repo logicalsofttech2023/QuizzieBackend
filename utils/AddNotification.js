@@ -1,4 +1,4 @@
-const { default: Notification } = require("../models/NotificationModel");
+const Notification  = require("../models/NotificationModel");
 
 const addNotification = async (userId, title, body) => {
   try {
