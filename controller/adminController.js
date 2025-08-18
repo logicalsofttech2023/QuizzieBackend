@@ -15,7 +15,7 @@ const ReferralSettings = require("../models/ReferralSettings");
 const Review = require("../models/Review");
 const QuizResult = require("../models/quiz_result_model");
 const ContactUs = require("../models/Contact");
-
+const BankDetails = require("../models/BankDetails");
 
 function calculateEndTime(startTime, totalQuestions) {
   if (!startTime || !totalQuestions) return null;
@@ -43,13 +43,25 @@ function calculateEndTime(startTime, totalQuestions) {
   return time24to12(endHours, endMinutes, endSeconds);
 }
 
+function parseCustomDate(dateString) {
+  const [datePart, timePart, meridian] = dateString.split(/[\s,]+/); // ["14/08/2025", "01:12:00", "AM"]
+
+  const [day, month, year] = datePart.split("/").map(Number);
+  let [hours, minutes, seconds] = timePart.split(":").map(Number);
+
+  if (meridian.toLowerCase() === "pm" && hours < 12) hours += 12;
+  if (meridian.toLowerCase() === "am" && hours === 12) hours = 0;
+
+  return new Date(year, month - 1, day, hours, minutes, seconds || 0);
+}
+
 const generateJwtToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
 };
 
-const adminSignup = async (req, res) => {
+const adminSignup = asyncHandler(async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -73,9 +85,9 @@ const adminSignup = async (req, res) => {
     console.error("Admin Signup Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
-};
+});
 
-const loginAdmin = async (req, res) => {
+const loginAdmin = asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -100,9 +112,9 @@ const loginAdmin = async (req, res) => {
     console.error("Admin Login Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
-};
+});
 
-const getAdminDetail = async (req, res) => {
+const getAdminDetail = asyncHandler(async (req, res) => {
   try {
     console.log(req.user);
 
@@ -124,9 +136,9 @@ const getAdminDetail = async (req, res) => {
     console.error("Error fetching admin details:", error);
     res.status(500).json({ message: "Internal Server Error", status: false });
   }
-};
+});
 
-const resetAdminPassword = async (req, res) => {
+const resetAdminPassword = asyncHandler(async (req, res) => {
   try {
     const adminId = req.user.id;
     const { newPassword, confirmPassword } = req.body;
@@ -173,9 +185,9 @@ const resetAdminPassword = async (req, res) => {
     console.error("Error resetting password:", error);
     res.status(500).json({ message: "Internal Server Error", status: false });
   }
-};
+});
 
-const updateAdminDetail = async (req, res) => {
+const updateAdminDetail = asyncHandler(async (req, res) => {
   try {
     const adminId = req.user.id;
     const { name, email } = req.body;
@@ -210,7 +222,7 @@ const updateAdminDetail = async (req, res) => {
     console.error("Error updating admin details:", error);
     res.status(500).json({ message: "Internal Server Error", status: false });
   }
-};
+});
 
 const getAllUsers = asyncHandler(async (req, res) => {
   try {
@@ -929,7 +941,7 @@ const updateQuestion = asyncHandler(async (req, res) => {
   }
 });
 
-const policyUpdate = async (req, res) => {
+const policyUpdate = asyncHandler(async (req, res) => {
   try {
     const { type, content } = req.body;
     if (!type || !content) {
@@ -960,9 +972,9 @@ const policyUpdate = async (req, res) => {
       error: error.message,
     });
   }
-};
+});
 
-const getPolicy = async (req, res) => {
+const getPolicy = asyncHandler(async (req, res) => {
   try {
     const { type } = req.query;
     if (!type) {
@@ -989,9 +1001,9 @@ const getPolicy = async (req, res) => {
       error: error.message,
     });
   }
-};
+});
 
-const addFAQ = async (req, res) => {
+const addFAQ = asyncHandler(async (req, res) => {
   try {
     const { question, answer } = req.body;
 
@@ -1013,9 +1025,9 @@ const addFAQ = async (req, res) => {
     console.error("Error adding FAQ:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const updateFAQ = async (req, res) => {
+const updateFAQ = asyncHandler(async (req, res) => {
   try {
     const { question, answer, isActive, id } = req.body;
 
@@ -1036,9 +1048,9 @@ const updateFAQ = async (req, res) => {
     console.error("Error updating FAQ:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const getAllFAQs = async (req, res) => {
+const getAllFAQs = asyncHandler(async (req, res) => {
   try {
     const faqs = await FAQ.find().sort({ createdAt: -1 });
     res.status(200).json({ faqs, message: "FAQ fetch successfully" });
@@ -1046,9 +1058,9 @@ const getAllFAQs = async (req, res) => {
     console.error("Error fetching FAQs:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const getFAQById = async (req, res) => {
+const getFAQById = asyncHandler(async (req, res) => {
   try {
     const { id } = req.query;
     const faq = await FAQ.findById(id);
@@ -1062,9 +1074,9 @@ const getFAQById = async (req, res) => {
     console.error("Error fetching FAQ:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const getAllTransaction = async (req, res) => {
+const getAllTransaction = asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query;
 
@@ -1107,9 +1119,9 @@ const getAllTransaction = async (req, res) => {
       status: false,
     });
   }
-};
+});
 
-const updateKycStatus = async (req, res) => {
+const updateKycStatus = asyncHandler(async (req, res) => {
   try {
     const { userId, status } = req.body;
 
@@ -1156,9 +1168,9 @@ const updateKycStatus = async (req, res) => {
       message: error.message,
     });
   }
-};
+});
 
-const getUserDetailsById = async (req, res) => {
+const getUserDetailsById = asyncHandler(async (req, res) => {
   try {
     const { id } = req.query;
 
@@ -1181,8 +1193,17 @@ const getUserDetailsById = async (req, res) => {
       .populate("quiz", "title date startTime endTime")
       .lean();
 
+    const bankDetails = await BankDetails.findOne({ userId: id });
+
     // 3. Attach KYC data
-    user.kyc = kyc;
+    if (kyc) {
+      user.kyc = kyc;
+    }
+
+    // 4. Attach Bank Details
+    if (bankDetails) {
+      user.bankDetails = bankDetails;
+    }
 
     return res.status(200).json({
       success: true,
@@ -1199,7 +1220,7 @@ const getUserDetailsById = async (req, res) => {
       error: error.message,
     });
   }
-};
+});
 
 const updateReferralBonus = asyncHandler(async (req, res) => {
   const { amount } = req.body;
@@ -1237,7 +1258,7 @@ const getReferralSettings = asyncHandler(async (req, res) => {
   });
 });
 
-const getAllReviews = async (req, res) => {
+const getAllReviews = asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query;
 
@@ -1280,10 +1301,9 @@ const getAllReviews = async (req, res) => {
       status: false,
     });
   }
-};
+});
 
-// ContactUs Controllers
-const addOrUpdateContactUs = async (req, res) => {
+const addOrUpdateContactUs = asyncHandler(async (req, res) => {
   try {
     const { id, officeLocation, email, phone } = req.body;
 
@@ -1342,16 +1362,150 @@ const addOrUpdateContactUs = async (req, res) => {
       message: error.message,
     });
   }
-};
+});
 
-const getContactUs = async (req, res) => {
+const getContactUs = asyncHandler(async (req, res) => {
   try {
     const contactUs = await ContactUs.findOne();
     res.status(200).json({ success: true, data: contactUs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
-};
+});
+
+const getAllQuizByTypeInAdmin = asyncHandler(async (req, res) => {
+  const currentDateTime = parseCustomDate(req.query.currentDateTime);
+  const { type, search = "", page = 1, limit = 10 } = req.query;
+
+  try {
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    // 🔍 Search filter
+    let quizFilter = {};
+    if (search) {
+      const regex = new RegExp(search, "i");
+      quizFilter = {
+        $or: [{ title: regex }, { description: regex }],
+      };
+    }
+
+    // पहले सारे quiz निकालो (search applied)
+    const allQuizzes = await Quiz.find(quizFilter).sort({ createdAt: -1 });
+
+    if (allQuizzes.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No quiz found",
+      });
+    }
+
+    // ✅ Classification buckets
+    const result = {
+      completed: [],
+      upcoming: [],
+      live: [],
+      expired: [],
+      todayQuiz: [],
+    };
+
+    const today = new Date(currentDateTime);
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    allQuizzes.forEach((quiz) => {
+      if (!quiz.startTime || !quiz.endTime) return;
+
+      const quizDate = new Date(quiz.date);
+
+      // Start Time Parse
+      const [startTime, startModifier] = quiz.startTime.split(" ");
+      let [sHours, sMinutes, sSeconds] = startTime?.split(":").map(Number) || [
+        0, 0, 0,
+      ];
+      if (startModifier?.toLowerCase() === "pm" && sHours < 12) sHours += 12;
+      if (startModifier?.toLowerCase() === "am" && sHours === 12) sHours = 0;
+      const quizStart = new Date(quizDate);
+      quizStart.setHours(sHours, sMinutes, sSeconds || 0, 0);
+
+      // End Time Parse
+      const [endTime, endModifier] = quiz.endTime.split(" ");
+      let [eHours, eMinutes, eSeconds] = endTime?.split(":").map(Number) || [
+        0, 0, 0,
+      ];
+      if (endModifier?.toLowerCase() === "pm" && eHours < 12) eHours += 12;
+      if (endModifier?.toLowerCase() === "am" && eHours === 12) eHours = 0;
+      const quizEnd = new Date(quizDate);
+      quizEnd.setHours(eHours, eMinutes, eSeconds || 0, 0);
+
+      // 📌 Today Quiz
+      if (quizDate >= today && quizDate < tomorrow) {
+        result.todayQuiz.push(quiz);
+      }
+
+      // 📌 Classification
+      if (quizStart > currentDateTime) {
+        result.upcoming.push(quiz);
+      } else if (quizStart <= currentDateTime && quizEnd >= currentDateTime) {
+        result.live.push(quiz);
+      } else if (quizEnd < currentDateTime && quiz.users?.length > 0) {
+        result.completed.push(quiz);
+      } else if (
+        quizEnd < currentDateTime &&
+        (!quiz.users || quiz.users.length === 0)
+      ) {
+        result.expired.push(quiz);
+      }
+    });
+
+    // ✅ अगर type दिया है तो सिर्फ उसी को pagination करो
+    if (type && result[type]) {
+      const total = result[type].length;
+      const paginated = result[type].slice(
+        (pageNum - 1) * limitNum,
+        pageNum * limitNum
+      );
+
+      return res.json({
+        code: 200,
+        status: true,
+        type,
+        total,
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: paginated,
+      });
+    }
+
+    // ✅ वरना सब categories का paginated result दो
+    const paginateCategory = (arr) =>
+      arr.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    return res.json({
+      code: 200,
+      status: true,
+      total: allQuizzes.length,
+      currentPage: pageNum,
+      totalPages: Math.ceil(allQuizzes.length / limitNum),
+      completed: paginateCategory(result.completed),
+      upcoming: paginateCategory(result.upcoming),
+      live: paginateCategory(result.live),
+      expired: paginateCategory(result.expired),
+      todayQuiz: paginateCategory(result.todayQuiz),
+    });
+  } catch (err) {
+    console.error("Error fetching quizzes:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
 
 module.exports = {
   adminSignup,
@@ -1388,4 +1542,5 @@ module.exports = {
   getAllReviews,
   addOrUpdateContactUs,
   getContactUs,
+  getAllQuizByTypeInAdmin,
 };

@@ -36,6 +36,7 @@ const {
   getAllReviews,
   getContactUs,
   addOrUpdateContactUs,
+  getAllQuizByTypeInAdmin,
 } = require("../controller/adminController");
 
 const { adminMiddleware } = require("../middlewares/adminMiddleware");
@@ -1073,6 +1074,7 @@ router.get("/getAllReviews", adminMiddleware, getAllReviews);
 router.get("/getContactUs", adminMiddleware, getContactUs);
 router.post("/addOrUpdateContactUs", adminMiddleware, addOrUpdateContactUs);
 
+router.get("/getAllQuizByTypeInAdmin", getAllQuizByTypeInAdmin);
 
 
 router.post('/seedquizzes', async (req, res) => {

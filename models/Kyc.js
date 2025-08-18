@@ -1,25 +1,6 @@
 const mongoose = require("mongoose");
 
-const bankDetailsSchema = new mongoose.Schema({
-  accountHolderName: {
-    type: String,
-    required: [true, "Account holder name is required"],
-    trim: true,
-  },
-  accountNumber: {
-    type: String,
-    required: [true, "Account number is required"],
-  },
-  ifscCode: {
-    type: String,
-    required: [true, "IFSC code is required"],
-  },
-  bankName: {
-    type: String,
-    required: [true, "Bank name is required"],
-    trim: true,
-  },
-});
+
 
 const kycSchema = new mongoose.Schema(
   {
@@ -53,10 +34,6 @@ const kycSchema = new mongoose.Schema(
       type: String,
       required: [true, "PAN back image is required"],
     },
-    bankDetails: {
-      type: bankDetailsSchema,
-      required: true,
-    },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
@@ -67,3 +44,4 @@ const kycSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Kyc", kycSchema);
+

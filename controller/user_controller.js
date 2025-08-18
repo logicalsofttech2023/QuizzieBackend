@@ -16,6 +16,7 @@ const Kyc = require("../models/Kyc");
 const ReferralSettings = require("../models/ReferralSettings");
 const Review = require("../models/Review");
 const QuizStreak = require("../models/QuizStreak");
+const BankDetails = require("../models/BankDetails");
 const generateTransactionId = () => {
   const randomString = crypto.randomBytes(5).toString("hex").toUpperCase();
   const formattedId = `QV${randomString.match(/.{1,2}/g).join("")}`;
@@ -1187,10 +1188,10 @@ const getAllNotificationsByUser = asyncHandler(async (req, res) => {
   }
 });
 
-const addKycDetails = async (req, res) => {
+const addKycDetails = asyncHandler(async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { aadharNo, panNo, bankDetails } = req.body;
+    const { aadharNo, panNo } = req.body;
 
     if (
       !req.files.aadharFrontImg ||
@@ -1212,7 +1213,6 @@ const addKycDetails = async (req, res) => {
       panNo,
       panFrontImg: req.files.panFrontImg[0].filename,
       panBackImg: req.files.panBackImg[0].filename,
-      bankDetails: JSON.parse(bankDetails),
     };
 
     // Check if KYC already exists
@@ -1240,12 +1240,12 @@ const addKycDetails = async (req, res) => {
   } catch (error) {
     res.status(500).json({ status: false, message: error.message });
   }
-};
+});
 
-const updateKycDetails = async (req, res) => {
+const updateKycDetails = asyncHandler(async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { aadharNo, panNo, bankDetails } = req.body;
+    const { aadharNo, panNo } = req.body;
 
     // Check if KYC exists
     const kyc = await Kyc.findOne({ userId });
@@ -1263,46 +1263,6 @@ const updateKycDetails = async (req, res) => {
 
     if (panNo) {
       kyc.panNo = panNo;
-    }
-
-    if (bankDetails) {
-      let parsedBankDetails;
-      try {
-        parsedBankDetails =
-          typeof bankDetails === "string"
-            ? JSON.parse(bankDetails)
-            : bankDetails;
-      } catch (err) {
-        return res.status(400).json({
-          status: false,
-          message: "Invalid bank details format",
-        });
-      }
-
-      // Validate required fields in bankDetails
-      const { accountHolderName, accountNumber, ifscCode, bankName } =
-        parsedBankDetails;
-
-      if (!accountHolderName || !accountNumber || !ifscCode || !bankName) {
-        return res.status(400).json({
-          status: false,
-          message: "All bank details fields are required",
-        });
-      }
-      if (!/^[0-9]{9,18}$/.test(accountNumber)) {
-        return res.status(400).json({
-          status: false,
-          message: "Invalid account number",
-        });
-      }
-      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode)) {
-        return res.status(400).json({
-          status: false,
-          message: "Invalid IFSC code",
-        });
-      }
-
-      kyc.bankDetails = parsedBankDetails;
     }
 
     // Optional image updates
@@ -1329,9 +1289,9 @@ const updateKycDetails = async (req, res) => {
   } catch (error) {
     res.status(500).json({ status: false, message: error.message });
   }
-};
+});
 
-const getMyKyc = async (req, res) => {
+const getMyKyc = asyncHandler(async (req, res) => {
   try {
     const userId = req.user?.id;
     const kyc = await Kyc.findOne({ userId }).populate(
@@ -1349,7 +1309,101 @@ const getMyKyc = async (req, res) => {
   } catch (error) {
     res.status(500).json({ status: false, message: error.message });
   }
-};
+});
+
+const addBankDetails = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { accountHolderName, accountNumber, ifscCode, bankName } = req.body;
+
+    // Validate required fields
+    if (!accountHolderName || !accountNumber || !ifscCode || !bankName) {
+      return res.status(400).json({
+        status: false,
+        message: "All bank details fields are required",
+      });
+    }
+
+    // Create new bank details
+    const bankDetails = await BankDetails.create({
+      userId,
+      accountHolderName,
+      accountNumber,
+      ifscCode,
+      bankName,
+    });
+
+    res.status(201).json({
+      status: true,
+      message: "Bank details added successfully",
+      data: bankDetails,
+    });
+  } catch (error) {
+    res.status(500).json({ status: false, message: error.message });
+  }
+});
+
+const updateBankDetails = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { accountHolderName, accountNumber, ifscCode, bankName } = req.body;
+
+    // Check if bank details exist
+    let bankDetails = await BankDetails.findOne({ userId });
+    if (!bankDetails) {
+      return res.status(404).json({
+        status: false,
+        message: "Bank details not found",
+      });
+    }
+
+    // Update fields only if provided
+    if (accountHolderName) {
+      bankDetails.accountHolderName = accountHolderName;
+    }
+    if (accountNumber) {
+      bankDetails.accountNumber = accountNumber;
+    }
+    if (ifscCode) {
+      bankDetails.ifscCode = ifscCode;
+    }
+    if (bankName) {
+      bankDetails.bankName = bankName;
+    }
+
+    await bankDetails.save();
+
+    res.status(200).json({
+      status: true,
+      message: "Bank details updated successfully",
+      data: bankDetails,
+    });
+  } catch (error) {
+    res.status(500).json({ status: false, message: error.message });
+  }
+});
+
+const getMyBankDetails = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const bankDetails = await BankDetails.findOne({ userId });
+    if (!bankDetails) {
+      return res.status(404).json({
+        status: false,
+        message: "Bank details not found",
+      });
+    }
+
+    res.status(200).json({
+      status: true,
+      message: "Bank details retrieved successfully",
+      data: bankDetails,
+    });
+  } catch (error) {
+    res.status(500).json({ status: false, message: error.message });
+  }
+});
 
 const getMyNotification = asyncHandler(async (req, res) => {
   try {
@@ -1549,4 +1603,7 @@ module.exports = {
   addReview,
   getUserTransaction,
   getStreak,
+  addBankDetails,
+  updateBankDetails,
+  getMyBankDetails,
 };

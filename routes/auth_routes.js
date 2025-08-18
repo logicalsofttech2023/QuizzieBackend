@@ -28,6 +28,9 @@ const {
   addReview,
   getUserTransaction,
   getStreak,
+  addBankDetails,
+  updateBankDetails,
+  getMyBankDetails,
 } = require("../controller/user_controller");
 const { authMiddleware } = require("../middlewares/auth_middleware");
 const { getPolicy, getAllFAQs } = require("../controller/adminController");
@@ -702,5 +705,8 @@ router.get("/getUserStats", authMiddleware, getUserStats);
 router.post("/addReview", authMiddleware, addReview);
 router.get("/getUserTransaction", authMiddleware, getUserTransaction);
 router.get("/getUserStreak", authMiddleware, getStreak);
+router.post("/addBankDetails", authMiddleware, addBankDetails);
+router.post("/updateBankDetails", authMiddleware, updateBankDetails);
+router.get("/getMyBankDetails", authMiddleware, getMyBankDetails);
 
 module.exports = router;
