@@ -16,6 +16,8 @@ const QuizResult = require("../models/quiz_result_model");
 const ContactUs = require("../models/Contact");
 const BankDetails = require("../models/BankDetails");
 const StreakReward = require("../models/StreakReward");
+const Badge = require("../models/StreakBadgeModel");
+const Ticket = require("../models/Ticket");
 
 function calculateEndTime(startTime, totalQuestions) {
   if (!startTime || !totalQuestions) return null;
@@ -1629,6 +1631,180 @@ const getAllStreakRewards = asyncHandler(async (req, res) => {
   }
 });
 
+const addStreakBadge = asyncHandler(async (req, res) => {
+  const { level, name } = req.body;
+  if (!level || !name) {
+    return res.status(400).json({
+      code: 400,
+      status: false,
+      message: "Level and name are required",
+    });
+  }
+
+  const badge = await Badge.create({ level, name });
+
+  res.status(201).json({
+    code: 201,
+    status: true,
+    message: "Badge added successfully",
+    data: badge,
+  });
+});
+
+const updateStreakBadge = asyncHandler(async (req, res) => {
+  const { level, name, id } = req.body;
+
+  if (!level || !name) {
+    return res.status(400).json({
+      code: 400,
+      status: false,
+      message: "Level and name are required",
+    });
+  }
+
+  const badge = await Badge.findByIdAndUpdate(
+    id,
+    { level, name },
+    { new: true }
+  );
+
+  if (!badge) {
+    return res.status(404).json({
+      code: 404,
+      status: false,
+      message: "Badge not found",
+    });
+  }
+
+  res.json({
+    code: 200,
+    status: true,
+    message: "Badge updated successfully",
+    data: badge,
+  });
+});
+
+const deleteStreakBadge = asyncHandler(async (req, res) => {
+  const { id } = req.query;
+
+  const badge = await Badge.findByIdAndDelete(id);
+  if (!badge) {
+    return res.status(404).json({
+      code: 404,
+      status: false,
+      message: "Badge not found",
+    });
+  }
+
+  res.json({
+    code: 200,
+    status: true,
+    message: "Badge deleted successfully",
+  });
+});
+
+const getAllStreakBadges = asyncHandler(async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [badges, total] = await Promise.all([
+      Badge.find().skip(skip).limit(parseInt(limit)).sort({ streakDay: 1 }),
+      Badge.countDocuments(),
+    ]);
+
+    if (badges.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No badges found",
+      });
+    }
+
+    res.json({
+      code: 200,
+      status: true,
+      badges,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (err) {
+    console.error("Error fetching badges:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+const getAllTickets = asyncHandler(async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    // First, find matching user IDs if search keyword is provided
+    let userFilter = {};
+
+    if (search) {
+      const regex = new RegExp(search, "i");
+      const matchingUsers = await User.find({
+        $or: [{ firstname: regex }, { lastname: regex }],
+      }).select("_id");
+
+      const userIds = matchingUsers.map((user) => user._id);
+      userFilter.userId = { $in: userIds };
+    }
+
+    const totalTickets = await Ticket.countDocuments(userFilter);
+
+    const tickets = await Ticket.find(userFilter)
+      .populate("userId")
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+
+    return res.status(200).json({
+      message: "Ticket history fetched successfully",
+      status: true,
+      totalTickets,
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalTickets / limitNum),
+      data: tickets,
+    });
+  } catch (error) {
+    console.error("Error fetching ticket history:", error);
+    return res.status(500).json({
+      message: "Server Error",
+      status: false,
+    });
+  }
+});
+
+const updateTicketStatus = asyncHandler(async (req, res) => {
+  try {
+    const { status, adminResponse, id } = req.body;
+
+    const ticket = await Ticket.findById(id);
+    if (!ticket) {
+      return res
+        .status(404)
+        .json({ status: false, message: "Ticket not found" });
+    }
+    if (status) ticket.status = status;
+    if (adminResponse) ticket.adminResponse = adminResponse;
+    await ticket.save();
+    res.json({ status: true, message: "Ticket updated successfully", ticket });
+  } catch (error) {
+    console.error("Error updating ticket status:", error);
+    res.status(500).json({ status: false, message: "Server Error" });
+  }
+});
+
 module.exports = {
   adminSignup,
   loginAdmin,
@@ -1669,4 +1845,10 @@ module.exports = {
   updateStreakReward,
   deleteStreakReward,
   getAllStreakRewards,
+  addStreakBadge,
+  updateStreakBadge,
+  deleteStreakBadge,
+  getAllStreakBadges,
+  getAllTickets,
+  updateTicketStatus
 };

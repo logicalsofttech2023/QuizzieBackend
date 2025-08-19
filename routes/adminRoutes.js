@@ -41,6 +41,12 @@ const {
   updateStreakReward,
   deleteStreakReward,
   getAllStreakRewards,
+  addStreakBadge,
+  updateStreakBadge,
+  deleteStreakBadge,
+  getAllStreakBadges,
+  getAllTickets,
+  updateTicketStatus,
 } = require("../controller/adminController");
 
 const { adminMiddleware } = require("../middlewares/adminMiddleware");
@@ -1077,6 +1083,14 @@ router.post("/addStreakReward", adminMiddleware, addStreakReward);
 router.post("/updateStreakReward", adminMiddleware, updateStreakReward);
 router.delete("/deleteStreakReward", adminMiddleware, deleteStreakReward);
 router.get("/getAllStreakRewards", adminMiddleware, getAllStreakRewards);
+
+router.post("/addStreakBadge", adminMiddleware, addStreakBadge);
+router.post("/updateStreakBadge", adminMiddleware, updateStreakBadge);
+router.delete("/deleteStreakBadge", adminMiddleware, deleteStreakBadge);
+router.get("/getAllStreakBadges", adminMiddleware, getAllStreakBadges);
+router.get("/getAllTickets", adminMiddleware, getAllTickets);
+router.post("/updateTicketStatus", adminMiddleware, updateTicketStatus);
+
 
 router.post("/seedquizzes", async (req, res) => {
   try {

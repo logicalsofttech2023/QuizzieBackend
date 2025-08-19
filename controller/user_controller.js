@@ -18,7 +18,8 @@ const Review = require("../models/Review");
 const QuizStreak = require("../models/QuizStreak");
 const BankDetails = require("../models/BankDetails");
 const handleStreak = require("../utils/handleStreak");
-
+const Badge = require("../models/StreakBadgeModel");
+const Ticket = require("../models/Ticket");
 
 const generateTransactionId = () => {
   const randomString = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -676,6 +677,10 @@ const addMoneyToWallet = async (req, res) => {
       return res.status(404).json({ message: "User not found", status: false });
     }
 
+    const gstRate = 0.28;
+    const gstAmount = amount * gstRate;
+    const netAmount = amount - gstAmount;
+
     // Ensure wallet is a number
     user.wallet = Number(user.wallet) + amount;
     await user.save();
@@ -686,7 +691,9 @@ const addMoneyToWallet = async (req, res) => {
     // Create a new transaction record
     const transaction = new Transaction({
       userId,
-      amount,
+      amount,       // User paid
+      gstAmount: gstAmount,      // GST (28%)
+      netAmount: netAmount, 
       type: "addMoney",
       status: "success",
       transactionId,
@@ -709,7 +716,6 @@ const addMoneyToWallet = async (req, res) => {
       // }
     } catch (notificationError) {
       console.error("Notification Error:", notificationError);
-      // Notification fail hone par bhi success response bhej rahe hain
     }
 
     res.status(200).json({
@@ -800,6 +806,7 @@ const getAllQuiz = asyncHandler(async (req, res) => {
 
 const getTodayQuiz = asyncHandler(async (req, res) => {
   const { type } = req.query;
+  const userId = req.user?.id;
   const currentDateTime = parseCustomDate(req.query.currentDateTime);
 
   try {
@@ -851,10 +858,20 @@ const getTodayQuiz = asyncHandler(async (req, res) => {
       });
     }
 
+    const quizzesWithStatus = validQuizzes.map((quiz) => {
+      const isJoined = quiz.users?.some(
+        (u) => u.toString() === userId.toString()
+      );
+      return {
+        ...quiz.toObject(),
+        isJoined, // true / false
+      };
+    });
+
     res.status(200).json({
       code: 200,
       status: true,
-      data: validQuizzes,
+      data: quizzesWithStatus,
     });
   } catch (err) {
     console.error("Error fetching today's quizzes:", err);
@@ -1015,6 +1032,138 @@ const joinQuiz = asyncHandler(async (req, res) => {
   }
 });
 
+// const submitQuizResult = asyncHandler(async (req, res) => {
+//   const user_id = req.user.id;
+//   const { quiz_id, answers } = req.body;
+
+//   if (!quiz_id || !user_id || !Array.isArray(answers)) {
+//     return res.status(400).json({
+//       message: "Required fields: quiz_id, user_id, answers[]",
+//     });
+//   }
+
+//   try {
+//     const questions = await Question.find({ quiz: quiz_id }).lean();
+
+//     let baseScore = 0;
+//     let correctCount = 0;
+//     let incorrectCount = 0;
+//     let notAttemptedCount = 0;
+//     let correctStreak = 0;
+//     let incorrectStreak = 0;
+//     let streakBonus = 0;
+
+//     const allAttempted = questions.every((q) =>
+//       answers.some(
+//         (ans) =>
+//           String(ans.questionId) === String(q._id) &&
+//           ans.selectedOptionIndex !== null &&
+//           ans.selectedOptionIndex !== undefined
+//       )
+//     );
+
+//     const processedAnswers = [];
+
+//     for (let i = 0; i < questions.length; i++) {
+//       const question = questions[i];
+//       const answerObj = answers.find(
+//         (ans) => String(ans.questionId) === String(question._id)
+//       );
+
+//       if (
+//         !answerObj ||
+//         answerObj.selectedOptionIndex === null ||
+//         answerObj.selectedOptionIndex === undefined
+//       ) {
+//         baseScore -= 1;
+//         notAttemptedCount++;
+//         correctStreak = 0;
+//         incorrectStreak = 0;
+//         processedAnswers.push({
+//           questionId: question._id,
+//           selectedOptionIndex: null,
+//         });
+//         continue;
+//       }
+
+//       const isCorrect =
+//         answerObj.selectedOptionIndex === question.correctOptionIndex;
+
+//       processedAnswers.push({
+//         questionId: question._id,
+//         selectedOptionIndex: answerObj.selectedOptionIndex,
+//       });
+
+//       if (isCorrect) {
+//         baseScore += 5;
+//         correctCount++;
+//         correctStreak++;
+//         incorrectStreak = 0;
+
+//         if (correctStreak > 1) {
+//           streakBonus += 0.5;
+//         }
+//       } else {
+//         baseScore -= 2;
+//         incorrectCount++;
+//         incorrectStreak++;
+//         correctStreak = 0;
+
+//         if (incorrectStreak > 1) {
+//           streakBonus -= 0.5;
+//         }
+//       }
+//     }
+
+//     const attemptedCount = questions.length - notAttemptedCount;
+//     let completionPercentage = 0;
+//     if (questions.length > 0) {
+//       completionPercentage = Number(
+//         ((attemptedCount / questions.length) * 100).toFixed(2)
+//       );
+//     }
+
+//     let bonusPoints = 0;
+
+//     if (allAttempted) bonusPoints += 30;
+
+//     if (correctCount >= 11 && correctCount <= 20) {
+//       bonusPoints += correctCount * 0.5;
+//     } else if (correctCount >= 21 && correctCount <= 30) {
+//       bonusPoints += correctCount * 1.5;
+//     }
+
+//     const totalScore = baseScore + streakBonus + bonusPoints;
+
+//     const quizResult = await QuizResult.create({
+//       user: user_id,
+//       quiz: quiz_id,
+//       points: totalScore,
+//       quizPlayed: 1,
+//       quizWon: 0,
+//       correctCount,
+//       incorrectCount,
+//       notAttemptedCount,
+//       attemptedCount,
+//       streakBonus,
+//       bonusPoints,
+//       answers: processedAnswers,
+//       completionPercentage,
+//     });
+
+//     return res.status(200).json({
+//       status: true,
+//       message: "Quiz submitted successfully",
+//       result: quizResult,
+//     });
+//   } catch (err) {
+//     console.error("Error submitting quiz result:", err);
+//     return res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: err.message });
+//   }
+// });
+
 const submitQuizResult = asyncHandler(async (req, res) => {
   const user_id = req.user.id;
   const { quiz_id, answers } = req.body;
@@ -1032,9 +1181,7 @@ const submitQuizResult = asyncHandler(async (req, res) => {
     let correctCount = 0;
     let incorrectCount = 0;
     let notAttemptedCount = 0;
-    let correctStreak = 0;
-    let incorrectStreak = 0;
-    let streakBonus = 0;
+    let processedAnswers = [];
 
     const allAttempted = questions.every((q) =>
       answers.some(
@@ -1045,10 +1192,9 @@ const submitQuizResult = asyncHandler(async (req, res) => {
       )
     );
 
-    const processedAnswers = [];
-
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
+      const questionNumber = i + 1; // Q1, Q2, Q3 ...Q30
       const answerObj = answers.find(
         (ans) => String(ans.questionId) === String(question._id)
       );
@@ -1058,10 +1204,9 @@ const submitQuizResult = asyncHandler(async (req, res) => {
         answerObj.selectedOptionIndex === null ||
         answerObj.selectedOptionIndex === undefined
       ) {
-        baseScore -= 1;
+        // Not attempted
+        baseScore -= 1; // same as before (you can change if needed)
         notAttemptedCount++;
-        correctStreak = 0;
-        incorrectStreak = 0;
         processedAnswers.push({
           questionId: question._id,
           selectedOptionIndex: null,
@@ -1078,23 +1223,15 @@ const submitQuizResult = asyncHandler(async (req, res) => {
       });
 
       if (isCorrect) {
-        baseScore += 5;
+        // ✅ Correct → +5.00X
+        const score = Number(`5.${String(questionNumber).padStart(3, "0")}`);
+        baseScore += score;
         correctCount++;
-        correctStreak++;
-        incorrectStreak = 0;
-
-        if (correctStreak > 1) {
-          streakBonus += 0.5;
-        }
       } else {
-        baseScore -= 2;
+        // ❌ Incorrect → -2.00X
+        const score = Number(`-2.${String(questionNumber).padStart(3, "0")}`);
+        baseScore += score;
         incorrectCount++;
-        incorrectStreak++;
-        correctStreak = 0;
-
-        if (incorrectStreak > 1) {
-          streakBonus -= 0.5;
-        }
       }
     }
 
@@ -1107,16 +1244,9 @@ const submitQuizResult = asyncHandler(async (req, res) => {
     }
 
     let bonusPoints = 0;
-
     if (allAttempted) bonusPoints += 30;
 
-    if (correctCount >= 11 && correctCount <= 20) {
-      bonusPoints += correctCount * 0.5;
-    } else if (correctCount >= 21 && correctCount <= 30) {
-      bonusPoints += correctCount * 1.5;
-    }
-
-    const totalScore = baseScore + streakBonus + bonusPoints;
+    const totalScore = baseScore + bonusPoints;
 
     const quizResult = await QuizResult.create({
       user: user_id,
@@ -1128,7 +1258,6 @@ const submitQuizResult = asyncHandler(async (req, res) => {
       incorrectCount,
       notAttemptedCount,
       attemptedCount,
-      streakBonus,
       bonusPoints,
       answers: processedAnswers,
       completionPercentage,
@@ -1445,6 +1574,9 @@ const getUserStats = asyncHandler(async (req, res) => {
     // Level calculation
     const level = 1 + Math.floor(quizzesPlayed / 10);
 
+    // Find Badge for this level
+    const badge = await Badge.findOne({ level });
+
     // Total wins (all correct answers in a quiz)
     const wins = await QuizResult.countDocuments({
       user: userId,
@@ -1480,6 +1612,11 @@ const getUserStats = asyncHandler(async (req, res) => {
         mobile: user.mobile,
         profilePic: user.profilePic || "",
         wallet: user.wallet,
+        badge: badge
+          ? {
+              name: badge.name,
+            }
+          : null,
       },
     });
   } catch (err) {
@@ -1577,6 +1714,55 @@ const getStreak = asyncHandler(async (req, res) => {
   });
 });
 
+const createTicket = asyncHandler(async (req, res) => {
+  const { subject, message } = req.body;
+  const userId = req.user.id;
+
+  if (!subject || !message) {
+    return res
+      .status(400)
+      .json({ status: false, message: "Subject and Message are required" });
+  }
+
+  const ticket = await Ticket.create({ userId, subject, message });
+
+  res.status(201).json({
+    status: true,
+    message: "Ticket created successfully",
+    ticket,
+  });
+});
+
+const getMyTickets = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const tickets = await Ticket.find({ userId }).sort({ createdAt: -1 });
+    if (!tickets || tickets.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No tickets found",
+      });
+    }
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Tickets fetched successfully",
+      tickets,
+    });
+  } catch (error) {
+    console.error("Error in getMyTickets:", error);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+});
+
+
+
 module.exports = {
   generateOtp,
   verifyOtp,
@@ -1609,4 +1795,6 @@ module.exports = {
   addBankDetails,
   updateBankDetails,
   getMyBankDetails,
+  createTicket,
+  getMyTickets
 };

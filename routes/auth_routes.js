@@ -31,6 +31,8 @@ const {
   addBankDetails,
   updateBankDetails,
   getMyBankDetails,
+  createTicket,
+  getMyTickets,
 } = require("../controller/user_controller");
 const { authMiddleware } = require("../middlewares/auth_middleware");
 const { getPolicy, getAllFAQs } = require("../controller/adminController");
@@ -548,7 +550,7 @@ router.get("/getQuizByStatus", getQuizByStatus);
  *                 transaction:
  *                   type: object
  */
-router.get("/addMoneyToWallet", authMiddleware, addMoneyToWallet);
+router.post("/addMoneyToWallet", authMiddleware, addMoneyToWallet);
 
 /**
  * @swagger
@@ -708,5 +710,7 @@ router.get("/getUserStreak", authMiddleware, getStreak);
 router.post("/addBankDetails", authMiddleware, addBankDetails);
 router.post("/updateBankDetails", authMiddleware, updateBankDetails);
 router.get("/getMyBankDetails", authMiddleware, getMyBankDetails);
+router.post("/createTicket", authMiddleware, createTicket);
+router.get("/getMyTickets", authMiddleware, getMyTickets);
 
 module.exports = router;
