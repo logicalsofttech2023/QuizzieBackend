@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+const rankPrizeSchema = new mongoose.Schema(
+  {
+    startRank: { type: Number, required: true },
+    endRank: { type: Number, required: true },
+    prize: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
 const quizSchema = new mongoose.Schema(
   {
     title: {
@@ -31,7 +40,13 @@ const quizSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["Mega_Quiz", "Special_Quiz", "Lite_Quiz", "Small_Battle_Quiz", "Practice_Quiz"],
+      enum: [
+        "Mega_Quiz",
+        "Special_Quiz",
+        "Lite_Quiz",
+        "Small_Battle_Quiz",
+        "Practice_Quiz",
+      ],
       required: true,
     },
     status: {
@@ -42,6 +57,10 @@ const quizSchema = new mongoose.Schema(
     users: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: "User",
+      default: [],
+    },
+    rankPrizes: {
+      type: [rankPrizeSchema],
       default: [],
     },
   },

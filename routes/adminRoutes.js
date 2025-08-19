@@ -37,13 +37,16 @@ const {
   getContactUs,
   addOrUpdateContactUs,
   getAllQuizByTypeInAdmin,
+  addStreakReward,
+  updateStreakReward,
+  deleteStreakReward,
+  getAllStreakRewards,
 } = require("../controller/adminController");
 
 const { adminMiddleware } = require("../middlewares/adminMiddleware");
 const Quiz = require("../models/quiz_model");
 const Question = require("../models/question_model");
-const quizData = require('../quizData.json');
-
+const quizData = require("../quizData.json");
 
 /**
  * @swagger
@@ -1061,23 +1064,21 @@ router.get(
  *                   type: string
  */
 router.get("/getAllTransaction", adminMiddleware, getAllTransaction);
-
 router.get("/getAllPracticeQuiz", adminMiddleware, getAllPracticeQuizInAdmin);
-
 router.post("/updateKycStatus", adminMiddleware, updateKycStatus);
-
 router.get("/getUserDetailsById", adminMiddleware, getUserDetailsById);
 router.get("/getReferralSettings", adminMiddleware, getReferralSettings);
 router.post("/updateReferralBonus", adminMiddleware, updateReferralBonus);
-
 router.get("/getAllReviews", adminMiddleware, getAllReviews);
 router.get("/getContactUs", adminMiddleware, getContactUs);
 router.post("/addOrUpdateContactUs", adminMiddleware, addOrUpdateContactUs);
-
 router.get("/getAllQuizByTypeInAdmin", getAllQuizByTypeInAdmin);
+router.post("/addStreakReward", adminMiddleware, addStreakReward);
+router.post("/updateStreakReward", adminMiddleware, updateStreakReward);
+router.delete("/deleteStreakReward", adminMiddleware, deleteStreakReward);
+router.get("/getAllStreakRewards", adminMiddleware, getAllStreakRewards);
 
-
-router.post('/seedquizzes', async (req, res) => {
+router.post("/seedquizzes", async (req, res) => {
   try {
     // Clear existing data (optional)
     await Quiz.deleteMany({});
@@ -1085,7 +1086,7 @@ router.post('/seedquizzes', async (req, res) => {
 
     // Insert new data
     const createdQuizzes = [];
-    
+
     for (const quiz of quizData.quizzes) {
       // Create quiz without questions first
       const { questions, ...quizData } = quiz;
@@ -1093,12 +1094,12 @@ router.post('/seedquizzes', async (req, res) => {
       createdQuizzes.push(newQuiz);
 
       // Create questions for this quiz
-      const questionPromises = questions.map(question => {
+      const questionPromises = questions.map((question) => {
         return Question.create({
           quiz: newQuiz._id,
           question: question.question,
           options: question.options,
-          correctOptionIndex: question.correctOptionIndex
+          correctOptionIndex: question.correctOptionIndex,
         });
       });
 
@@ -1107,16 +1108,15 @@ router.post('/seedquizzes', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Database seeded successfully',
-      data: createdQuizzes
+      message: "Database seeded successfully",
+      data: createdQuizzes,
     });
-
   } catch (error) {
-    console.error('Error seeding database:', error);
+    console.error("Error seeding database:", error);
     res.status(500).json({
       success: false,
-      message: 'Error seeding database',
-      error: error.message
+      message: "Error seeding database",
+      error: error.message,
     });
   }
 });

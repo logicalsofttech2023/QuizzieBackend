@@ -17,6 +17,9 @@ const ReferralSettings = require("../models/ReferralSettings");
 const Review = require("../models/Review");
 const QuizStreak = require("../models/QuizStreak");
 const BankDetails = require("../models/BankDetails");
+const handleStreak = require("../utils/handleStreak");
+
+
 const generateTransactionId = () => {
   const randomString = crypto.randomBytes(5).toString("hex").toUpperCase();
   const formattedId = `QV${randomString.match(/.{1,2}/g).join("")}`;
@@ -726,7 +729,9 @@ const getAllQuiz = asyncHandler(async (req, res) => {
   const currentDateTime = parseCustomDate(req.query.currentDateTime);
 
   try {
-    const allQuizzes = await Quiz.find().sort({ createdAt: -1 });
+    const allQuizzes = await Quiz.find({ users: userId }).sort({
+      createdAt: -1,
+    });
 
     if (allQuizzes.length === 0) {
       return res.status(404).json({
@@ -741,9 +746,7 @@ const getAllQuiz = asyncHandler(async (req, res) => {
     const live = [];
 
     allQuizzes.forEach((quiz) => {
-      if (quiz.users.includes(userId)) {
-        completed.push(quiz);
-      }
+      completed.push(quiz);
 
       // If startTime is missing, skip time-based classification
       if (!quiz.startTime) {
@@ -998,8 +1001,8 @@ const joinQuiz = asyncHandler(async (req, res) => {
       message: isAlreadyJoined
         ? "You have already joined. Please wait for the quiz to start."
         : "You have successfully joined the quiz. Please wait for it to start.",
-        streak,
-        reward
+      streak,
+      reward,
     });
   } catch (err) {
     console.error("Error joining quiz:", err);

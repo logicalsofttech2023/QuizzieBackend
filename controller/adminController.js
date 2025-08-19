@@ -1,6 +1,5 @@
 const { Policy, FAQ } = require("../models/PolicyModel");
 const Transaction = require("../models/TransactionModel");
-
 const Quiz = require("../models/quiz_model");
 const Question = require("../models/question_model");
 const asyncHandler = require("express-async-handler");
@@ -16,6 +15,7 @@ const Review = require("../models/Review");
 const QuizResult = require("../models/quiz_result_model");
 const ContactUs = require("../models/Contact");
 const BankDetails = require("../models/BankDetails");
+const StreakReward = require("../models/StreakReward");
 
 function calculateEndTime(startTime, totalQuestions) {
   if (!startTime || !totalQuestions) return null;
@@ -374,6 +374,7 @@ const createQuiz = asyncHandler(async (req, res) => {
     type,
     status,
     startTime,
+    rankPrizes,
   } = req.body;
   console.log(req.body);
 
@@ -422,6 +423,10 @@ const createQuiz = asyncHandler(async (req, res) => {
       newQuizData.joiningAmount = joiningAmount;
       newQuizData.status = status;
       newQuizData.startTime = startTime;
+    }
+
+    if (rankPrizes && Array.isArray(rankPrizes)) {
+      newQuizData.rankPrizes = rankPrizes;
     }
 
     const newQuiz = await Quiz.create(newQuizData);
@@ -616,6 +621,7 @@ const updateQuiz = asyncHandler(async (req, res) => {
     entries,
     status,
     startTime,
+    rankPrizes,
   } = req.body;
 
   try {
@@ -666,6 +672,10 @@ const updateQuiz = asyncHandler(async (req, res) => {
         ...(status && { status }),
         ...(startTime && { startTime }),
       };
+
+      if (rankPrizes && Array.isArray(rankPrizes)) {
+        updateFields.rankPrizes = rankPrizes;
+      }
 
       // If startTime is being updated, recalculate endTime
       if (startTime && startTime !== quiz.startTime) {
@@ -1507,6 +1517,118 @@ const getAllQuizByTypeInAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+const addStreakReward = asyncHandler(async (req, res) => {
+  const { streakDay, rewardAmount } = req.body;
+
+  if (!streakDay || !rewardAmount) {
+    return res.status(400).json({
+      code: 400,
+      status: false,
+      message: "streakDay and rewardAmount are required",
+    });
+  }
+
+  const existing = await StreakReward.findOne({ streakDay });
+  if (existing) {
+    return res.status(409).json({
+      code: 409,
+      status: false,
+      message: "Reward for this streakDay already exists",
+    });
+  }
+
+  const reward = await StreakReward.create({ streakDay, rewardAmount });
+  res.status(201).json({
+    code: 201,
+    status: true,
+    message: "Reward added successfully",
+    reward,
+  });
+});
+
+const updateStreakReward = asyncHandler(async (req, res) => {
+  const { streakDay, rewardAmount, id } = req.body;
+  const reward = await StreakReward.findByIdAndUpdate(
+    id,
+    { streakDay, rewardAmount },
+    { new: true }
+  );
+
+  if (!reward) {
+    return res.status(404).json({
+      code: 404,
+      status: false,
+      message: "Reward not found",
+    });
+  }
+
+  res.json({
+    code: 200,
+    status: true,
+    message: "Reward updated successfully",
+    reward,
+  });
+});
+
+const deleteStreakReward = asyncHandler(async (req, res) => {
+  const { id } = req.query;
+
+  const reward = await StreakReward.findByIdAndDelete(id);
+  if (!reward) {
+    return res.status(404).json({
+      code: 404,
+      status: false,
+      message: "Reward not found",
+    });
+  }
+
+  res.json({
+    code: 200,
+    status: true,
+    message: "Reward deleted successfully",
+  });
+});
+
+const getAllStreakRewards = asyncHandler(async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [rewards, total] = await Promise.all([
+      StreakReward.find()
+        .skip(skip)
+        .limit(parseInt(limit))
+        .sort({ streakDay: 1 }),
+      StreakReward.countDocuments(),
+    ]);
+
+    if (rewards.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No rewards found",
+      });
+    }
+
+    res.json({
+      code: 200,
+      status: true,
+      rewards,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (err) {
+    console.error("Error fetching rewards:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
 module.exports = {
   adminSignup,
   loginAdmin,
@@ -1543,4 +1665,8 @@ module.exports = {
   addOrUpdateContactUs,
   getContactUs,
   getAllQuizByTypeInAdmin,
+  addStreakReward,
+  updateStreakReward,
+  deleteStreakReward,
+  getAllStreakRewards,
 };
