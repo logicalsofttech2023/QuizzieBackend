@@ -9,7 +9,7 @@ const transactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["addMoney", "quizParticipation", "referralBonus"],
+      enum: ["addMoney", "quizParticipation", "referralBonus", "adminReferralBonus"],
       required: true,
     },
     status: {
@@ -17,9 +17,9 @@ const transactionSchema = new mongoose.Schema(
       enum: ["pending", "success", "failed"],
       default: "pending",
     },
-    amount: { type: Number, required: true }, // User paid
-    gstAmount: { type: Number, required: true }, // GST deducted
-    netAmount: { type: Number, required: true },
+    amount: { type: Number },
+    gstAmount: { type: Number },
+    netAmount: { type: Number },
     transactionId: { type: String, unique: true },
     description: { type: String },
   },

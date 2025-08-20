@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
 
 // Declare the Schema of the Mongo model
 var userSchema = new mongoose.Schema(
@@ -51,6 +50,28 @@ var userSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    referralBonusGiven: { type: Boolean, default: false },
+    hasJoinedQuiz: { type: Boolean, default: false },
+    referralBonus: {
+      type: Number,
+      default: 0,
+    },
+    referralEarnings: [
+      {
+        referredUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        amount: {
+          type: Number,
+          default: 0,
+        },
+        earnedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     wallet: {
       type: String,
       default: 0,

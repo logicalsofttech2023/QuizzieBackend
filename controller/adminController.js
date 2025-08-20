@@ -10,7 +10,10 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const lodash = require("lodash");
 const Kyc = require("../models/Kyc");
-const ReferralSettings = require("../models/ReferralSettings");
+const {
+  ReferralSettings,
+  ReferralCode,
+} = require("../models/ReferralSettings");
 const Review = require("../models/Review");
 const QuizResult = require("../models/quiz_result_model");
 const ContactUs = require("../models/Contact");
@@ -1090,13 +1093,12 @@ const getFAQById = asyncHandler(async (req, res) => {
 
 const getAllTransaction = asyncHandler(async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, limit = 10, search = "", type } = req.query;
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
 
-    // First, find matching user IDs if search keyword is provided
-    let userFilter = {};
+    let transactionFilter = {};
 
     if (search) {
       const regex = new RegExp(search, "i");
@@ -1105,12 +1107,18 @@ const getAllTransaction = asyncHandler(async (req, res) => {
       }).select("_id");
 
       const userIds = matchingUsers.map((user) => user._id);
-      userFilter.userId = { $in: userIds };
+      transactionFilter.userId = { $in: userIds };
     }
 
-    const totalTransactions = await Transaction.countDocuments(userFilter);
+    if (type && ["addMoney", "quizParticipation", "referralBonus", "adminReferralBonus"].includes(type)) {
+      transactionFilter.type = type;
+    }
 
-    const transactions = await Transaction.find(userFilter)
+    // Count total
+    const totalTransactions = await Transaction.countDocuments(transactionFilter);
+
+    // Get paginated results
+    const transactions = await Transaction.find(transactionFilter)
       .populate("userId")
       .sort({ createdAt: -1 })
       .skip((pageNum - 1) * limitNum)
@@ -1132,6 +1140,7 @@ const getAllTransaction = asyncHandler(async (req, res) => {
     });
   }
 });
+
 
 const updateKycStatus = asyncHandler(async (req, res) => {
   try {
@@ -1805,6 +1814,136 @@ const updateTicketStatus = asyncHandler(async (req, res) => {
   }
 });
 
+const createReferralCode = asyncHandler(async (req, res) => {
+  try {
+    const { code, bonusAmount } = req.body;
+
+    const existing = await ReferralCode.findOne({ code: code.toUpperCase() });
+    if (existing) {
+      return res.json({
+        code: 409,
+        status: false,
+        message: "Referral code already exists",
+      });
+    }
+
+    const referral = await ReferralCode.create({
+      code: code.toUpperCase(),
+      bonusAmount,
+    });
+
+    res.json({
+      code: 201,
+      status: true,
+      message: "Referral code created successfully",
+      data: referral,
+    });
+  } catch (error) {
+    console.error("Error creating referral code:", error);
+    res
+      .status(500)
+      .json({ code: 500, status: false, message: "Internal server error" });
+  }
+});
+
+const updateReferralCode = asyncHandler(async (req, res) => {
+  try {
+    const { id, code, bonusAmount, isActive } = req.body;
+
+    const referral = await ReferralCode.findById(id);
+    if (!referral) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Referral code not found",
+      });
+    }
+
+    referral.code = code.toUpperCase();
+    referral.bonusAmount = bonusAmount;
+    referral.isActive = isActive;
+
+    await referral.save();
+
+    res.json({
+      code: 200,
+      status: true,
+      message: "Referral code updated successfully",
+      data: referral,
+    });
+  } catch (error) {
+    console.error("Error updating referral code:", error);
+    res
+      .status(500)
+      .json({ code: 500, status: false, message: "Internal server error" });
+  }
+});
+
+const deleteReferralCode = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    const referral = await ReferralCode.findByIdAndDelete(id);
+    if (!referral) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Referral code not found",
+      });
+    }
+
+    res.json({
+      code: 200,
+      status: true,
+      message: "Referral code deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting referral code:", error);
+    res
+      .status(500)
+      .json({ code: 500, status: false, message: "Internal server error" });
+  }
+});
+
+const getAllReferralCodes = asyncHandler(async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [referralCodes, total] = await Promise.all([
+      ReferralCode.find()
+        .skip(skip)
+        .limit(parseInt(limit))
+        .sort({ createdAt: -1 }),
+      ReferralCode.countDocuments(),
+    ]);
+
+    if (referralCodes.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No referral codes found",
+      });
+    }
+
+    res.json({
+      code: 200,
+      status: true,
+      data: referralCodes,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error("Error fetching referral codes:", error);
+    res
+      .status(500)
+      .json({ code: 500, status: false, message: "Internal server error" });
+  }
+});
+
+
+
 module.exports = {
   adminSignup,
   loginAdmin,
@@ -1850,5 +1989,9 @@ module.exports = {
   deleteStreakBadge,
   getAllStreakBadges,
   getAllTickets,
-  updateTicketStatus
+  updateTicketStatus,
+  createReferralCode,
+  updateReferralCode,
+  deleteReferralCode,
+  getAllReferralCodes,
 };

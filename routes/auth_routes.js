@@ -33,6 +33,11 @@ const {
   getMyBankDetails,
   createTicket,
   getMyTickets,
+  getMyReferrals,
+  getMyReferralEarnings,
+  joinPracticeQuiz,
+  submitPracticeQuizResult,
+  getAllPracticeQuiz,
 } = require("../controller/user_controller");
 const { authMiddleware } = require("../middlewares/auth_middleware");
 const { getPolicy, getAllFAQs } = require("../controller/adminController");
@@ -712,5 +717,10 @@ router.post("/updateBankDetails", authMiddleware, updateBankDetails);
 router.get("/getMyBankDetails", authMiddleware, getMyBankDetails);
 router.post("/createTicket", authMiddleware, createTicket);
 router.get("/getMyTickets", authMiddleware, getMyTickets);
+router.get("/getMyReferrals", authMiddleware, getMyReferrals);
+router.get("/getMyReferralEarnings", authMiddleware, getMyReferralEarnings);
+router.post("/joinPracticeQuiz", authMiddleware, joinPracticeQuiz);
+router.post("/submitPracticeQuizResult", authMiddleware, submitPracticeQuizResult);
+router.get("/getAllPracticeQuiz", authMiddleware, getAllPracticeQuiz);
 
 module.exports = router;

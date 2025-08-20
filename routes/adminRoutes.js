@@ -47,6 +47,10 @@ const {
   getAllStreakBadges,
   getAllTickets,
   updateTicketStatus,
+  createReferralCode,
+  updateReferralCode,
+  deleteReferralCode,
+  getAllReferralCodes,
 } = require("../controller/adminController");
 
 const { adminMiddleware } = require("../middlewares/adminMiddleware");
@@ -1090,7 +1094,10 @@ router.delete("/deleteStreakBadge", adminMiddleware, deleteStreakBadge);
 router.get("/getAllStreakBadges", adminMiddleware, getAllStreakBadges);
 router.get("/getAllTickets", adminMiddleware, getAllTickets);
 router.post("/updateTicketStatus", adminMiddleware, updateTicketStatus);
-
+router.post("/createReferralCode", adminMiddleware, createReferralCode);
+router.post("/updateReferralCode", adminMiddleware, updateReferralCode);
+router.post("/deleteReferralCode", adminMiddleware, deleteReferralCode);
+router.get("/getAllReferralCodes", adminMiddleware, getAllReferralCodes);
 
 router.post("/seedquizzes", async (req, res) => {
   try {

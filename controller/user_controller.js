@@ -13,13 +13,18 @@ const crypto = require("crypto");
 const addNotification = require("../utils/AddNotification");
 const Notification = require("../models/NotificationModel");
 const Kyc = require("../models/Kyc");
-const ReferralSettings = require("../models/ReferralSettings");
+const {
+  ReferralSettings,
+  ReferralCode,
+} = require("../models/ReferralSettings");
 const Review = require("../models/Review");
 const QuizStreak = require("../models/QuizStreak");
 const BankDetails = require("../models/BankDetails");
 const handleStreak = require("../utils/handleStreak");
 const Badge = require("../models/StreakBadgeModel");
 const Ticket = require("../models/Ticket");
+const { profile } = require("console");
+const PracticeQuizResult = require("../models/PracticeQuizResult");
 
 const generateTransactionId = () => {
   const randomString = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -41,6 +46,14 @@ function parseCustomDate(dateString) {
 
 const generateReferralCode = (name) => {
   return `${name.toUpperCase()}${Math.floor(1000 + Math.random() * 9000)}`;
+};
+
+const getPerformanceFeedback = (accuracy) => {
+  if (accuracy >= 90) return "Excellent! You've mastered this topic!";
+  if (accuracy >= 75) return "Great job! You have a good understanding.";
+  if (accuracy >= 60) return "Good effort! Keep practicing to improve.";
+  if (accuracy >= 40) return "You're getting there! Review the concepts.";
+  return "Keep practicing! You'll improve with more attempts.";
 };
 
 const generateOtp = asyncHandler(async (req, res) => {
@@ -227,57 +240,50 @@ const registerUser = asyncHandler(async (req, res) => {
 
   user.referralCode = generateReferralCode(firstname);
 
+  // ✅ Referral Handling
   if (referralCode) {
     const referrer = await User.findOne({
       referralCode: referralCode.toUpperCase(),
     });
+
     if (referrer) {
-      user.referredBy = referrer._id;
-
-      // Get referral bonus from settings
-      const settings = (await ReferralSettings.findOne()) || {
-        referralBonus: 10,
-      };
+      const settings = await ReferralSettings.findOne();
       const bonusAmount = Number(settings.referralBonus);
-      referrer.wallet = Number(referrer.wallet || 0) + bonusAmount;
-      await referrer.save();
-
-      // 📝 Create transaction for referrer
-      const transactionId = generateTransactionId();
-      const transaction = new Transaction({
-        userId: referrer._id,
-        amount: bonusAmount,
-        type: "referralBonus",
-        status: "success",
-        transactionId,
-        description: `Referral bonus for inviting ${firstname} ${lastname}`,
+      user.referredBy = referrer._id;
+      user.referralBonus = bonusAmount;
+    } else {
+      // 2️⃣ If not User referral, then check in Admin ReferralCode collection
+      const adminReferral = await ReferralCode.findOne({
+        code: referralCode.toUpperCase(),
+        isActive: true,
       });
-      await transaction.save();
 
-      // 🔔 Send notification to referrer
-      const referrerTitle = "Referral Bonus Credited";
-      const referrerBody = `You earned ₹${bonusAmount} for referring ${firstname} ${lastname}. Your new balance is ₹${referrer.wallet}.`;
+      if (adminReferral) {
+        const bonusAmount = Number(adminReferral.bonusAmount);
 
-      try {
-        await addNotification(referrer._id, referrerTitle, referrerBody);
-        // if (referrer.firebaseToken) {
-        //   await sendNotification(referrer.firebaseToken, referrerTitle, referrerBody);
-        // }
-      } catch (err) {
-        console.error("Referral notification error (referrer):", err);
-      }
+        user.wallet = Number(user.wallet || 0) + bonusAmount;
 
-      // 🔔 Send notification to new user
-      const newUserTitle = "Welcome! Referral Applied";
-      const newUserBody = `You joined using ${referrer.firstname}'s referral code. They earned ₹${bonusAmount}.`;
+        // Transaction for user
+        const transactionId = generateTransactionId();
+        await Transaction.create({
+          userId: user._id,
+          amount: bonusAmount,
+          type: "adminReferralBonus",
+          status: "success",
+          transactionId,
+          description: `Referral bonus credited for using code ${adminReferral.code}`,
+        });
 
-      try {
-        await addNotification(user._id, newUserTitle, newUserBody);
-        // if (user.firebaseToken) {
-        //   await sendNotification(user.firebaseToken, newUserTitle, newUserBody);
-        // }
-      } catch (err) {
-        console.error("Referral notification error (new user):", err);
+        // Notification
+        try {
+          await addNotification(
+            user._id,
+            "Referral Bonus Credited",
+            `You received ₹${bonusAmount} for using referral code ${adminReferral.code}.`
+          );
+        } catch (err) {
+          console.error("Referral notification error (admin code):", err);
+        }
       }
     }
   }
@@ -691,9 +697,9 @@ const addMoneyToWallet = async (req, res) => {
     // Create a new transaction record
     const transaction = new Transaction({
       userId,
-      amount,       // User paid
-      gstAmount: gstAmount,      // GST (28%)
-      netAmount: netAmount, 
+      amount,
+      gstAmount: gstAmount,
+      netAmount: netAmount,
       type: "addMoney",
       status: "success",
       transactionId,
@@ -884,6 +890,240 @@ const getTodayQuiz = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllPracticeQuiz = asyncHandler(async (req, res) => {
+  try {
+    const quizzes = await Quiz.find({ type: "Practice_Quiz" }).lean();
+
+    if (!quizzes.length) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No practice quizzes found",
+      });
+    }
+
+    res.status(200).json({
+      code: 200,
+      status: true,
+      data: quizzes,
+    });
+  } catch (err) {
+    console.error("Error fetching practice quizzes:", err);
+    res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+const joinPracticeQuiz = asyncHandler(async (req, res) => {
+  const user_id = req.user?.id;
+  const { quiz_id } = req.body;
+
+  try {
+    if (!validateMongoDbId(quiz_id)) {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "Invalid quiz id format",
+      });
+    }
+
+    const quiz = await Quiz.findById(quiz_id);
+    if (!quiz) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Quiz not found",
+      });
+    }
+
+    // Check if it's actually a Practice_Quiz
+    if (quiz.type !== "Practice_Quiz") {
+      return res.status(400).json({
+        code: 400,
+        status: false,
+        message: "This API is only for Practice Quiz",
+      });
+    }
+
+    const user = await User.findById(user_id);
+    if (!user) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if already joined (optional for practice quiz)
+    const isAlreadyJoined = quiz.users.includes(user_id);
+
+    // Add user to quiz if not already joined
+    if (!isAlreadyJoined) {
+      quiz.users.push(user_id);
+      await quiz.save();
+    }
+
+    // Get all questions for practice quiz
+    const questions = await Question.find({ quiz: quiz._id })
+      .select("-correctOptionIndex")
+      .lean();
+
+    // Add timing info if needed (optional for practice)
+    const questionsWithTime = questions.map((q, idx) => ({
+      ...q,
+      remainingTime: 0, // No time limit for practice
+      isPractice: true,
+    }));
+
+    return res.status(200).json({
+      code: 200,
+      status: true,
+      message: isAlreadyJoined
+        ? "Welcome back to practice quiz"
+        : "Practice quiz started successfully",
+      quiz: {
+        _id: quiz._id,
+        title: quiz.title,
+        description: quiz.description,
+        type: quiz.type,
+      },
+      questions: questionsWithTime,
+      totalQuestions: questions.length,
+    });
+  } catch (err) {
+    console.error("Error joining practice quiz:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
+const submitPracticeQuizResult = asyncHandler(async (req, res) => {
+  const user_id = req.user.id;
+  const { quiz_id, answers } = req.body;
+
+  if (!quiz_id || !user_id || !Array.isArray(answers)) {
+    return res.status(400).json({
+      code: 400,
+      status: false,
+      message: "Required fields: quiz_id, user_id, answers[]",
+    });
+  }
+
+  try {
+    const quiz = await Quiz.findById(quiz_id);
+    if (!quiz || quiz.type !== "Practice_Quiz") {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Practice quiz not found",
+      });
+    }
+
+    const questions = await Question.find({ quiz: quiz_id }).lean();
+
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let notAttemptedCount = 0;
+    let detailedResults = [];
+
+    // Calculate results with detailed feedback
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+      const answerObj = answers.find(
+        (ans) => String(ans.questionId) === String(question._id)
+      );
+
+      const selectedOptionIndex = answerObj?.selectedOptionIndex;
+      const isAttempted =
+        selectedOptionIndex !== null && selectedOptionIndex !== undefined;
+
+      let isCorrect = false;
+      let score = 0;
+
+      if (!isAttempted) {
+        notAttemptedCount++;
+      } else {
+        isCorrect = selectedOptionIndex === question.correctOptionIndex;
+        if (isCorrect) {
+          correctCount++;
+          score = 1;
+        } else {
+          incorrectCount++;
+        }
+      }
+
+      detailedResults.push({
+        questionId: question._id,
+        questionText: question.questionText,
+        options: question.options,
+        selectedOptionIndex: selectedOptionIndex,
+        correctOptionIndex: question.correctOptionIndex,
+        isCorrect: isCorrect,
+        isAttempted: isAttempted,
+        explanation: question.explanation || "",
+        score: score,
+      });
+    }
+
+    const totalScore = correctCount;
+    const totalQuestions = questions.length;
+    const accuracy =
+      totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+
+    // Save practice result (optional - you might not want to save practice results)
+    const practiceResult = await PracticeQuizResult.create({
+      user: user_id,
+      quiz: quiz_id,
+      totalScore: totalScore,
+      correctCount: correctCount,
+      incorrectCount: incorrectCount,
+      notAttemptedCount: notAttemptedCount,
+      accuracy: accuracy,
+      totalQuestions: totalQuestions,
+      detailedResults: detailedResults,
+      submittedAt: new Date(),
+    });
+
+    return res.status(200).json({
+      code: 200,
+      status: true,
+      message: "Practice quiz submitted successfully",
+      result: {
+        _id: practiceResult._id,
+        user: practiceResult.user,
+        quiz: practiceResult.quiz,
+        totalScore: practiceResult.totalScore,
+        correctCount: practiceResult.correctCount,
+        incorrectCount: practiceResult.incorrectCount,
+        notAttemptedCount: practiceResult.notAttemptedCount,
+        accuracy: practiceResult.accuracy,
+        totalQuestions: practiceResult.totalQuestions,
+        detailedResults: practiceResult.detailedResults,
+        submittedAt: practiceResult.submittedAt,
+        createdAt: practiceResult.createdAt,
+        updatedAt: practiceResult.updatedAt,
+        performance: getPerformanceFeedback(accuracy),
+      },
+    });
+  } catch (err) {
+    console.error("Error submitting practice quiz:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
+});
+
 const joinQuiz = asyncHandler(async (req, res) => {
   const user_id = req.user?.id;
   const { quiz_id, dateTime } = req.body;
@@ -973,6 +1213,52 @@ const joinQuiz = asyncHandler(async (req, res) => {
     // ✅ Call Streak Handler
     const { streak, reward } = await handleStreak(user_id, currentDateTime);
 
+    // ✅ Referral bonus trigger for referrer
+    if (!user.hasJoinedQuiz) {
+      user.hasJoinedQuiz = true;
+
+      if (user.referredBy && !user.referralBonusGiven) {
+        const referrer = await User.findById(user.referredBy);
+
+        if (referrer) {
+          const settings = (await ReferralSettings.findOne()) || {
+            referralBonus: 10,
+          };
+          const bonusAmount = Number(settings.referralBonus);
+          referrer.wallet = Number(referrer.wallet || 0) + bonusAmount;
+
+          referrer.referralEarnings.push({
+            referredUserId: user._id,
+            amount: bonusAmount,
+            earnedAt: new Date(),
+          });
+
+          await referrer.save();
+
+          // Transaction
+          const transactionId = generateTransactionId();
+          await Transaction.create({
+            userId: referrer._id,
+            amount: bonusAmount,
+            type: "referralBonus",
+            status: "success",
+            transactionId,
+            description: `Referral bonus for invitee ${user.firstname} ${user.lastname} joining first quiz`,
+          });
+
+          // Notification
+          await addNotification(
+            referrer._id,
+            "Referral Bonus Unlocked",
+            `${user.firstname} ${user.lastname} joined a quiz. You earned ₹${bonusAmount}.`
+          );
+
+          user.referralBonusGiven = true;
+        }
+      }
+      await user.save();
+    }
+
     // Question skip logic
     const questionTimeSec = 10; // each question 10 sec
     const totalQuestions = await Question.countDocuments({ quiz: quiz._id });
@@ -1031,138 +1317,6 @@ const joinQuiz = asyncHandler(async (req, res) => {
     });
   }
 });
-
-// const submitQuizResult = asyncHandler(async (req, res) => {
-//   const user_id = req.user.id;
-//   const { quiz_id, answers } = req.body;
-
-//   if (!quiz_id || !user_id || !Array.isArray(answers)) {
-//     return res.status(400).json({
-//       message: "Required fields: quiz_id, user_id, answers[]",
-//     });
-//   }
-
-//   try {
-//     const questions = await Question.find({ quiz: quiz_id }).lean();
-
-//     let baseScore = 0;
-//     let correctCount = 0;
-//     let incorrectCount = 0;
-//     let notAttemptedCount = 0;
-//     let correctStreak = 0;
-//     let incorrectStreak = 0;
-//     let streakBonus = 0;
-
-//     const allAttempted = questions.every((q) =>
-//       answers.some(
-//         (ans) =>
-//           String(ans.questionId) === String(q._id) &&
-//           ans.selectedOptionIndex !== null &&
-//           ans.selectedOptionIndex !== undefined
-//       )
-//     );
-
-//     const processedAnswers = [];
-
-//     for (let i = 0; i < questions.length; i++) {
-//       const question = questions[i];
-//       const answerObj = answers.find(
-//         (ans) => String(ans.questionId) === String(question._id)
-//       );
-
-//       if (
-//         !answerObj ||
-//         answerObj.selectedOptionIndex === null ||
-//         answerObj.selectedOptionIndex === undefined
-//       ) {
-//         baseScore -= 1;
-//         notAttemptedCount++;
-//         correctStreak = 0;
-//         incorrectStreak = 0;
-//         processedAnswers.push({
-//           questionId: question._id,
-//           selectedOptionIndex: null,
-//         });
-//         continue;
-//       }
-
-//       const isCorrect =
-//         answerObj.selectedOptionIndex === question.correctOptionIndex;
-
-//       processedAnswers.push({
-//         questionId: question._id,
-//         selectedOptionIndex: answerObj.selectedOptionIndex,
-//       });
-
-//       if (isCorrect) {
-//         baseScore += 5;
-//         correctCount++;
-//         correctStreak++;
-//         incorrectStreak = 0;
-
-//         if (correctStreak > 1) {
-//           streakBonus += 0.5;
-//         }
-//       } else {
-//         baseScore -= 2;
-//         incorrectCount++;
-//         incorrectStreak++;
-//         correctStreak = 0;
-
-//         if (incorrectStreak > 1) {
-//           streakBonus -= 0.5;
-//         }
-//       }
-//     }
-
-//     const attemptedCount = questions.length - notAttemptedCount;
-//     let completionPercentage = 0;
-//     if (questions.length > 0) {
-//       completionPercentage = Number(
-//         ((attemptedCount / questions.length) * 100).toFixed(2)
-//       );
-//     }
-
-//     let bonusPoints = 0;
-
-//     if (allAttempted) bonusPoints += 30;
-
-//     if (correctCount >= 11 && correctCount <= 20) {
-//       bonusPoints += correctCount * 0.5;
-//     } else if (correctCount >= 21 && correctCount <= 30) {
-//       bonusPoints += correctCount * 1.5;
-//     }
-
-//     const totalScore = baseScore + streakBonus + bonusPoints;
-
-//     const quizResult = await QuizResult.create({
-//       user: user_id,
-//       quiz: quiz_id,
-//       points: totalScore,
-//       quizPlayed: 1,
-//       quizWon: 0,
-//       correctCount,
-//       incorrectCount,
-//       notAttemptedCount,
-//       attemptedCount,
-//       streakBonus,
-//       bonusPoints,
-//       answers: processedAnswers,
-//       completionPercentage,
-//     });
-
-//     return res.status(200).json({
-//       status: true,
-//       message: "Quiz submitted successfully",
-//       result: quizResult,
-//     });
-//   } catch (err) {
-//     console.error("Error submitting quiz result:", err);
-//     return res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: err.message });
-//   }
-// });
 
 const submitQuizResult = asyncHandler(async (req, res) => {
   const user_id = req.user.id;
@@ -1588,6 +1742,8 @@ const getUserStats = asyncHandler(async (req, res) => {
       },
     });
 
+    const kyc = await Kyc.findOne({ userId });
+
     // Skill score (out of 1000)
     // Example formula: Average score / maxPossibleScore * 1000
     const results = await QuizResult.find({ user: userId }).select("points");
@@ -1612,6 +1768,7 @@ const getUserStats = asyncHandler(async (req, res) => {
         mobile: user.mobile,
         profilePic: user.profilePic || "",
         wallet: user.wallet,
+        kycStatus: kyc ? kyc?.status : "",
         badge: badge
           ? {
               name: badge.name,
@@ -1761,7 +1918,93 @@ const getMyTickets = asyncHandler(async (req, res) => {
   }
 });
 
+const getMyReferrals = asyncHandler(async (req, res) => {
+  const user_id = req.user.id;
 
+  try {
+    const referrals = await User.find({ referredBy: user_id });
+    if (!referrals || referrals.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "No referrals found",
+      });
+    }
+
+    return res.json({
+      code: 200,
+      status: true,
+      message: "My referrals fetched successfully",
+      data: referrals.map((r) => ({
+        name: `${r.firstname} ${r.lastname}`,
+        profilePic: r.profilePic,
+        referralApplied: r.referredBy?.toString() === user_id,
+        joinedQuiz: r.hasJoinedQuiz,
+        bonusGiven: r.referralBonusGiven ? r.referralBonus : 0,
+        registeredAt: r.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("Error fetching referrals:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+const getMyReferralEarnings = asyncHandler(async (req, res) => {
+  const user_id = req.user.id;
+
+  try {
+    const user = await User.findById(user_id).populate({
+      path: "referralEarnings.referredUserId",
+      select: "firstname lastname profilePic",
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "User not found",
+      });
+    }
+
+    // Calculate total earnings
+    const totalEarnings = user.referralEarnings.reduce((total, earning) => {
+      return total + earning.amount;
+    }, 0);
+
+    // Format the response
+    const earningsData = user.referralEarnings.map((earning) => ({
+      referredUser: {
+        id: earning.referredUserId._id,
+        name: `${earning.referredUserId.firstname} ${earning.referredUserId.lastname}`,
+        profilePic: earning.referredUserId.profilePic,
+      },
+      amount: earning.amount,
+      earnedAt: earning.earnedAt,
+    }));
+
+    return res.json({
+      code: 200,
+      status: true,
+      message: "Referral earnings fetched successfully",
+      data: {
+        totalEarnings,
+        earnings: earningsData,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching referral earnings:", err);
+    return res.status(500).json({
+      code: 500,
+      status: false,
+      message: "Internal server error",
+    });
+  }
+});
 
 module.exports = {
   generateOtp,
@@ -1796,5 +2039,10 @@ module.exports = {
   updateBankDetails,
   getMyBankDetails,
   createTicket,
-  getMyTickets
+  getMyTickets,
+  getMyReferrals,
+  getMyReferralEarnings,
+  joinPracticeQuiz,
+  submitPracticeQuizResult,
+  getAllPracticeQuiz,
 };
